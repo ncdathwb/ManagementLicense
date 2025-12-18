@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Manager với Verify Online</title>
+    <title>License Manager Pro - API Fixed</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
@@ -97,6 +97,16 @@
             border-radius: 5px;
             margin: 15px 0;
         }
+        .api-response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
     </style>
 </head>
 <body>
@@ -106,9 +116,9 @@
             <div class="row align-items-center">
                 <div class="col-md-8">
                     <h1 class="text-primary mb-2">
-                        <i class="bi bi-shield-check"></i> License Manager Pro
+                        <i class="bi bi-shield-check"></i> License Manager Pro - API Fixed
                     </h1>
-                    <p class="text-muted mb-0">Quản lý license với tính năng verify online từ bất kỳ ứng dụng nào</p>
+                    <p class="text-muted mb-0">Quản lý license với API endpoint đúng chuẩn JSON</p>
                 </div>
                 <div class="col-md-4 text-end">
                     <div class="d-flex justify-content-end align-items-center gap-2">
@@ -216,6 +226,20 @@
                         <div class="mb-4">
                             <h4><i class="bi bi-search text-primary"></i> Verify License</h4>
                             <p class="text-muted">Nhập license key để kiểm tra trạng thái</p>
+                            
+                            <!-- Kiểm tra license key từ hình ảnh -->
+                            <div class="mb-3">
+                                <label class="form-label">Test với key từ hình ảnh:</label>
+                                <div class="d-flex gap-2 mb-2">
+                                    <button class="btn btn-outline-primary btn-sm" onclick="setTestKey('LIC-WBB61UL-F700')">
+                                        LIC-WBB61UL-F700
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="setTestKey('LICC-WBB61_ULF_F700')">
+                                        LICC-WBB61_ULF_F700
+                                    </button>
+                                </div>
+                            </div>
+                            
                             <div class="input-group mb-3">
                                 <input type="text" class="form-control" id="verifyKeyInput" 
                                        placeholder="Nhập license key cần verify...">
@@ -230,9 +254,9 @@
                             <h6><i class="bi bi-lightbulb"></i> Cách sử dụng trong ứng dụng khác:</h6>
                             <p class="mb-2">Sử dụng URL sau trong ứng dụng của bạn để verify license:</p>
                             <div class="verify-url mb-2">
-                                <code id="verifyUrl">https://your-domain.com/verify.html?key=LICENSE_KEY_HERE</code>
+                                <code id="apiEndpoint">Loading...</code>
                             </div>
-                            <small class="text-muted">Thay thế LICENSE_KEY_HERE bằng key thực tế</small>
+                            <small class="text-muted">API endpoint trả về JSON đúng chuẩn</small>
                         </div>
                     </div>
                     
@@ -255,12 +279,20 @@
                             <div class="mb-2">
                                 <small class="text-muted">GET Request:</small>
                                 <div class="verify-url">
-                                    <code id="apiUrl">window.location.origin + window.location.pathname + "?verify=LICENSE_KEY"</code>
+                                    <code id="apiTestUrl">Loading...</code>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-outline-success" onclick="testApi()">
+                            <div class="mb-2">
+                                <input type="text" class="form-control form-control-sm" id="testApiKey" 
+                                       placeholder="Nhập key để test API">
+                            </div>
+                            <button class="btn btn-sm btn-outline-success me-2" onclick="testApi()">
                                 <i class="bi bi-play-circle"></i> Test API Call
                             </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="viewApiResponse()">
+                                <i class="bi bi-eye"></i> View Response
+                            </button>
+                            <div id="apiResponseContainer" class="mt-3"></div>
                         </div>
                     </div>
                 </div>
@@ -273,77 +305,118 @@
                         <h4><i class="bi bi-plug text-primary"></i> Integration Guide</h4>
                         
                         <div class="mb-4">
-                            <h6>1. Verify trong Web App</h6>
-                            <pre class="bg-light p-3 rounded"><code>// JavaScript
+                            <h6>1. API Endpoint đúng</h6>
+                            <div class="alert alert-success">
+                                <strong>GET Request:</strong><br>
+                                <code id="correctApiEndpoint">Loading...</code>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6>2. Verify trong Web App</h6>
+                            <pre class="bg-light p-3 rounded"><code>// JavaScript - SỬ DỤNG ENDPOINT NÀY
 async function verifyLicense(key) {
-    const url = `${window.location.origin}${window.location.pathname}?verify=${key}`;
-    const response = await fetch(url);
-    const result = await response.json();
+    // Endpoint đúng - thêm .json hoặc ?format=json
+    const url = `${window.location.origin}${window.location.pathname}?key=${key}&format=json`;
     
-    if (result.valid) {
-        console.log('License hợp lệ đến:', result.expiry);
-    } else {
-        console.log('License không hợp lệ:', result.message);
+    try {
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.valid) {
+            console.log('License hợp lệ đến:', result.expiry);
+            return true;
+        } else {
+            console.log('License không hợp lệ:', result.message);
+            return false;
+        }
+    } catch (error) {
+        console.error('Lỗi verify license:', error);
+        return false;
     }
 }</code></pre>
                         </div>
 
                         <div class="mb-4">
-                            <h6>2. Verify trong Desktop/Mobile App</h6>
-                            <pre class="bg-light p-3 rounded"><code>// Python
+                            <h6>3. Verify trong Python</h6>
+                            <pre class="bg-light p-3 rounded"><code># Python
 import requests
 import json
 
 def verify_license(key):
-    # Lưu file HTML này trên server
-    verify_url = "https://your-server.com/license-verify.html"
-    response = requests.get(f"{verify_url}?verify={key}")
-    data = json.loads(response.text)
+    # URL của file HTML này (lưu trên server)
+    base_url = "https://your-domain.com/license-manager.html"
     
-    return data['valid'], data['message']</code></pre>
+    # Sử dụng endpoint đúng
+    url = f"{base_url}?key={key}&format=json"
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Kiểm tra lỗi HTTP
+        
+        # Parse JSON response
+        data = response.json()
+        
+        if data['valid']:
+            print(f"License hợp lệ đến: {data['expiry']}")
+            return True
+        else:
+            print(f"License không hợp lệ: {data['message']}")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        print(f"Lỗi kết nối: {e}")
+        return False
+    except json.JSONDecodeError as e:
+        print(f"Lỗi parse JSON: {e}")
+        return False</code></pre>
                         </div>
                     </div>
                     
                     <div class="col-md-6">
-                        <h4><i class="bi bi-shield-check text-primary"></i> Live Verification</h4>
+                        <h4><i class="bi bi-shield-check text-primary"></i> Live API Response</h4>
                         
                         <div class="mb-4">
-                            <h6>License Verification Endpoint</h6>
-                            <p class="text-muted">Endpoint này hoạt động từ bất kỳ domain nào</p>
-                            <div class="verify-url mb-2">
-                                <code id="liveEndpoint">Loading...</code>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-sm btn-outline-primary" onclick="copyEndpoint()">
-                                    <i class="bi bi-copy"></i> Copy Endpoint
-                                </button>
-                                <button class="btn btn-sm btn-outline-success" onclick="refreshEndpoint()">
-                                    <i class="bi bi-arrow-clockwise"></i> Refresh
-                                </button>
-                            </div>
+                            <h6>Response Format (JSON)</h6>
+                            <pre class="bg-light p-3 rounded"><code>{
+    "success": true,
+    "valid": true,
+    "key": "LIC-WBB61UL-F700",
+    "expiry": "2025-12-31T23:59:59.000Z",
+    "status": "active",
+    "message": "License hợp lệ",
+    "days_remaining": 351,
+    "time_remaining": "351 ngày 5 giờ",
+    "note": "Quản lý chăm sóc khách hàng công ty DMI",
+    "timestamp": "2024-01-15T10:30:00.000Z"
+}</code></pre>
                         </div>
 
                         <div class="mb-4">
-                            <h6>Response Format</h6>
+                            <h6>Error Response Format</h6>
                             <pre class="bg-light p-3 rounded"><code>{
-    "valid": true,
-    "key": "LICENSE-123",
-    "expiry": "2024-12-31T23:59:59",
-    "status": "active",
-    "message": "License hợp lệ",
-    "days_remaining": 45,
-    "timestamp": "2024-01-15T10:30:00"
+    "success": false,
+    "valid": false,
+    "key": "INVALID-KEY",
+    "message": "License không tồn tại",
+    "timestamp": "2024-01-15T10:30:00.000Z"
 }</code></pre>
                         </div>
 
                         <div class="note-box">
-                            <h6><i class="bi bi-info-circle"></i> Lưu ý quan trọng:</h6>
+                            <h6><i class="bi bi-exclamation-triangle"></i> Lỗi thường gặp & Fix:</h6>
                             <ul class="mb-0">
-                                <li>Lưu file này trên web server để có thể truy cập từ bất kỳ đâu</li>
-                                <li>Sử dụng HTTPS để bảo mật</li>
-                                <li>Dữ liệu license được lưu trong localStorage của trình duyệt</li>
-                                <li>Để đồng bộ nhiều thiết bị, cần lưu file trên server</li>
+                                <li><strong>Lỗi: "Unexpected token '<'"</strong> → Thêm <code>&format=json</code> vào URL</li>
+                                <li><strong>Lỗi: "is not valid JSON"</strong> → Server trả về HTML thay vì JSON</li>
+                                <li><strong>Fix:</strong> Luôn thêm <code>?key=LICENSE_KEY&format=json</code></li>
+                                <li><strong>TIP:</strong> Đổi tên file thành <code>license-api.html</code> để rõ ràng</li>
                             </ul>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <h6><i class="bi bi-info-circle"></i> Cấu hình Server (Nếu cần):</h6>
+                            <p class="mb-0 small">Đối với một số server, bạn cần cấu hình MIME type cho file .html trả về JSON:</p>
+                            <code class="d-block mt-2 small">AddType application/json .html</code>
                         </div>
                     </div>
                 </div>
@@ -366,10 +439,10 @@ def verify_license(key):
                                 <div class="mb-3">
                                     <label class="form-label">License Key *</label>
                                     <input type="text" class="form-control" id="licenseKey" required
-                                           placeholder="VD: PRO-2024-ABC123-XYZ789"
-                                           pattern="[A-Z0-9\-]{10,50}"
-                                           title="Chỉ chấp nhận chữ hoa, số và dấu gạch ngang">
-                                    <div class="form-text">Sử dụng định dạng dễ nhận biết cho verify</div>
+                                           placeholder="VD: LIC-WBB61UL-F700"
+                                           pattern="[A-Z0-9\-_]{5,50}"
+                                           title="Chỉ chấp nhận chữ hoa, số, dấu gạch ngang và gạch dưới">
+                                    <div class="form-text">Sử dụng định dạng như trong hình ảnh</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -384,8 +457,8 @@ def verify_license(key):
                             <div class="col-md-12">
                                 <div class="mb-3">
                                     <label class="form-label">Thông tin thêm (optional)</label>
-                                    <input type="text" class="form-control" id="licenseNote"
-                                           placeholder="Ghi chú, tên khách hàng, sản phẩm...">
+                                    <textarea class="form-control" id="licenseNote" rows="2"
+                                              placeholder="Ghi chú, tên khách hàng, sản phẩm..."></textarea>
                                 </div>
                             </div>
                         </div>
@@ -393,16 +466,10 @@ def verify_license(key):
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Thêm nhanh</label>
+                                    <label class="form-label">Thêm theo hình ảnh mẫu:</label>
                                     <div class="d-flex gap-2">
-                                        <button type="button" class="btn btn-outline-primary flex-fill" onclick="addDays(30)">
-                                            30 ngày
-                                        </button>
-                                        <button type="button" class="btn btn-outline-primary flex-fill" onclick="addDays(90)">
-                                            90 ngày
-                                        </button>
-                                        <button type="button" class="btn btn-outline-primary flex-fill" onclick="addDays(365)">
-                                            1 năm
+                                        <button type="button" class="btn btn-outline-primary flex-fill" onclick="addSampleFromImage()">
+                                            <i class="bi bi-image"></i> Thêm mẫu
                                         </button>
                                     </div>
                                 </div>
@@ -414,8 +481,8 @@ def verify_license(key):
                                         <button type="button" class="btn btn-outline-secondary flex-fill" onclick="generateRandomKey()">
                                             <i class="bi bi-shuffle"></i> Random Key
                                         </button>
-                                        <button type="button" class="btn btn-outline-secondary flex-fill" onclick="setNow()">
-                                            <i class="bi bi-clock"></i> Hết hạn ngay
+                                        <button type="button" class="btn btn-outline-secondary flex-fill" onclick="setOneYear()">
+                                            <i class="bi bi-calendar"></i> 1 năm
                                         </button>
                                     </div>
                                 </div>
@@ -425,15 +492,6 @@ def verify_license(key):
                         <div class="alert alert-info" id="previewSection" style="display: none;">
                             <h6><i class="bi bi-eye"></i> Preview</h6>
                             <div id="previewContent"></div>
-                        </div>
-
-                        <div class="alert alert-warning">
-                            <h6><i class="bi bi-exclamation-triangle"></i> Lưu ý quan trọng:</h6>
-                            <ul class="mb-0 small">
-                                <li>License key sẽ được sử dụng để verify từ các ứng dụng khác</li>
-                                <li>Lưu file này lên web server để có thể verify online</li>
-                                <li>Dữ liệu được lưu trong trình duyệt hiện tại</li>
-                            </ul>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -455,54 +513,181 @@ def verify_license(key):
         let licenses = [];
         let currentEditKey = null;
         const STORAGE_KEY = 'licenseManagerData';
+        let isApiMode = false; // Flag để xác định API mode
 
         // Khởi tạo khi trang được tải
         document.addEventListener('DOMContentLoaded', function() {
             loadLicenses();
             renderLicenses();
             updateStats();
-            updateLiveEndpoint();
+            updateApiEndpoints();
             
-            // Xử lý verify từ URL
-            handleUrlVerification();
+            // Kiểm tra nếu đang ở chế độ API
+            checkApiMode();
             
             // Thêm event listeners
             document.getElementById('expiryDate').addEventListener('change', updatePreview);
             document.getElementById('licenseKey').addEventListener('input', updatePreview);
+            
+            // Thêm dữ liệu mẫu từ hình ảnh nếu chưa có
+            if (licenses.length === 0) {
+                addSampleDataFromImage();
+            }
         });
 
-        // Xử lý verify từ URL parameters
-        function handleUrlVerification() {
+        // Kiểm tra API mode
+        function checkApiMode() {
             const urlParams = new URLSearchParams(window.location.search);
-            const verifyKey = urlParams.get('verify');
+            const key = urlParams.get('key');
+            const format = urlParams.get('format');
             
-            if (verifyKey) {
-                // Chuyển sang tab verify
-                const verifyTab = new bootstrap.Tab(document.getElementById('verify-tab'));
-                verifyTab.show();
-                
-                // Điền key và verify
-                document.getElementById('verifyKeyInput').value = verifyKey;
-                setTimeout(() => verifyLicense(), 500);
-                
-                // Xóa param để tránh verify lại khi refresh
-                const newUrl = window.location.pathname;
-                window.history.replaceState({}, document.title, newUrl);
+            if (key || format === 'json') {
+                isApiMode = true;
+                handleApiRequest();
             }
+        }
+
+        // Xử lý API request
+        function handleApiRequest() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const key = urlParams.get('key');
+            const format = urlParams.get('format');
+            
+            // Chỉ trả về JSON nếu có format=json hoặc có key parameter
+            if (format === 'json' || key) {
+                const response = verifyLicenseApi(key);
+                
+                // Set content type to JSON
+                document.body.innerHTML = '';
+                document.write(JSON.stringify(response, null, 2));
+                document.close();
+            }
+        }
+
+        // API function để verify license
+        function verifyLicenseApi(key) {
+            const now = new Date();
+            
+            if (!key) {
+                return {
+                    success: false,
+                    valid: false,
+                    message: 'Thiếu license key',
+                    timestamp: now.toISOString()
+                };
+            }
+            
+            // Tìm license (case-insensitive)
+            const license = licenses.find(l => l.key.toUpperCase() === key.toUpperCase());
+            
+            if (!license) {
+                return {
+                    success: false,
+                    valid: false,
+                    key: key,
+                    message: 'License không tồn tại',
+                    timestamp: now.toISOString()
+                };
+            }
+            
+            const status = getLicenseStatus(license.expiry);
+            const expiry = new Date(license.expiry);
+            
+            return {
+                success: true,
+                valid: status.valid,
+                key: license.key,
+                expiry: license.expiry,
+                status: status.status,
+                message: status.valid ? 
+                    (status.status === 'expiring' ? 'License sắp hết hạn' : 'License hợp lệ') : 
+                    'License đã hết hạn',
+                days_remaining: status.days,
+                time_remaining: formatTimeRemaining(license.expiry),
+                note: license.note || '',
+                timestamp: now.toISOString(),
+                created: license.created,
+                updated: license.updated || license.created
+            };
+        }
+
+        // Thêm dữ liệu mẫu từ hình ảnh
+        function addSampleDataFromImage() {
+            const now = new Date();
+            const nextYear = new Date(now);
+            nextYear.setFullYear(nextYear.getFullYear() + 3); // 3 năm sau
+            
+            const sampleLicenses = [
+                {
+                    key: "LIC-WBB61UL-F700",
+                    expiry: nextYear.toISOString(),
+                    note: "Quản lý chăm sóc khách hàng công ty DMI",
+                    created: now.toISOString(),
+                    updated: now.toISOString()
+                },
+                {
+                    key: "LICC-WBB61_ULF_F700",
+                    expiry: "2025-10-12T23:59:59.000Z",
+                    note: "License đặc biệt cho dự án WBB61",
+                    created: now.toISOString(),
+                    updated: now.toISOString()
+                }
+            ];
+            
+            licenses = sampleLicenses;
+            saveLicenses();
+            renderLicenses();
+            updateStats();
+        }
+
+        // Set test key từ hình ảnh
+        function setTestKey(key) {
+            document.getElementById('verifyKeyInput').value = key;
+            document.getElementById('qrKeyInput').value = key;
+            document.getElementById('testApiKey').value = key;
+        }
+
+        // Thêm mẫu từ hình ảnh
+        function addSampleFromImage() {
+            document.getElementById('licenseKey').value = 'LIC-WBB61UL-F700';
+            document.getElementById('licenseNote').value = 'Quản lý chăm sóc khách hàng công ty DMI';
+            
+            // Set thời gian hết hạn 3 năm sau
+            const expiryDate = new Date();
+            expiryDate.setFullYear(expiryDate.getFullYear() + 3);
+            expiryDate.setMinutes(expiryDate.getMinutes() - expiryDate.getTimezoneOffset());
+            document.getElementById('expiryDate').value = expiryDate.toISOString().slice(0, 16);
+            
+            updatePreview();
         }
 
         // Tạo key ngẫu nhiên
         function generateRandomKey() {
+            const prefix = 'LIC';
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let key = 'LIC-';
-            for (let i = 0; i < 8; i++) {
+            let key = prefix + '-';
+            
+            // 6 ký tự
+            for (let i = 0; i < 6; i++) {
                 key += chars.charAt(Math.floor(Math.random() * chars.length));
             }
             key += '-';
+            
+            // 4 ký tự
             for (let i = 0; i < 4; i++) {
                 key += chars.charAt(Math.floor(Math.random() * chars.length));
             }
+            
             document.getElementById('licenseKey').value = key;
+            updatePreview();
+        }
+
+        // Set 1 năm
+        function setOneYear() {
+            const date = new Date();
+            date.setFullYear(date.getFullYear() + 1);
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            document.getElementById('expiryDate').value = date.toISOString().slice(0, 16);
             updatePreview();
         }
 
@@ -559,14 +744,13 @@ def verify_license(key):
             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
             const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-            const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
             
             if (diffDays > 0) {
                 return `${diffDays} ngày ${diffHours} giờ`;
             } else if (diffHours > 0) {
                 return `${diffHours} giờ ${diffMinutes} phút`;
             } else {
-                return `${diffMinutes} phút ${diffSeconds} giây`;
+                return `${diffMinutes} phút`;
             }
         }
 
@@ -579,9 +763,9 @@ def verify_license(key):
             document.getElementById('licenseKey').readOnly = false;
             document.getElementById('licenseNote').value = '';
             
-            // Đặt thời gian mặc định
+            // Đặt thời gian mặc định 1 năm sau
             const defaultDate = new Date();
-            defaultDate.setDate(defaultDate.getDate() + 30);
+            defaultDate.setFullYear(defaultDate.getFullYear() + 1);
             defaultDate.setMinutes(defaultDate.getMinutes() - defaultDate.getTimezoneOffset());
             document.getElementById('expiryDate').value = defaultDate.toISOString().slice(0, 16);
             
@@ -665,23 +849,6 @@ def verify_license(key):
                 `;
                 document.getElementById('previewSection').style.display = 'block';
             }
-        }
-
-        // Thêm ngày
-        function addDays(days) {
-            const date = new Date();
-            date.setDate(date.getDate() + days);
-            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-            document.getElementById('expiryDate').value = date.toISOString().slice(0, 16);
-            updatePreview();
-        }
-
-        // Đặt thời gian hiện tại
-        function setNow() {
-            const date = new Date();
-            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-            document.getElementById('expiryDate').value = date.toISOString().slice(0, 16);
-            updatePreview();
         }
 
         // Lưu license
@@ -832,7 +999,7 @@ def verify_license(key):
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 <button class="btn btn-sm btn-outline-success action-btn" 
-                                        onclick="showVerifyUrl('${license.key}')" title="Verify URL">
+                                        onclick="showApiUrl('${license.key}')" title="API URL">
                                     <i class="bi bi-link"></i>
                                 </button>
                             </div>
@@ -899,36 +1066,24 @@ def verify_license(key):
                 return;
             }
             
-            const license = licenses.find(l => l.key === key);
+            const result = verifyLicenseApi(key);
             const resultDiv = document.getElementById('verifyResult');
-            
-            if (!license) {
-                resultDiv.innerHTML = `
-                    <div class="alert alert-danger">
-                        <h5><i class="bi bi-x-circle"></i> License không tồn tại</h5>
-                        <p class="mb-0">License key <strong>${key}</strong> không tìm thấy trong hệ thống.</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            const status = getLicenseStatus(license.expiry);
-            const expiry = formatDateTime(license.expiry);
-            const timeRemaining = formatTimeRemaining(license.expiry);
             
             let alertClass = '';
             let icon = '';
             let title = '';
             
-            if (status.valid) {
-                alertClass = status.status === 'expiring' ? 'alert-warning' : 'alert-success';
-                icon = status.status === 'expiring' ? 'bi-exclamation-triangle' : 'bi-check-circle';
-                title = status.status === 'expiring' ? 'Sắp hết hạn' : 'License hợp lệ';
+            if (result.valid) {
+                alertClass = result.status === 'expiring' ? 'alert-warning' : 'alert-success';
+                icon = result.status === 'expiring' ? 'bi-exclamation-triangle' : 'bi-check-circle';
+                title = result.status === 'expiring' ? 'Sắp hết hạn' : 'License hợp lệ';
             } else {
                 alertClass = 'alert-danger';
                 icon = 'bi-x-circle';
-                title = 'License đã hết hạn';
+                title = 'License không hợp lệ';
             }
+            
+            const expiryFormatted = result.expiry ? formatDateTime(result.expiry) : 'N/A';
             
             resultDiv.innerHTML = `
                 <div class="alert ${alertClass}">
@@ -940,27 +1095,27 @@ def verify_license(key):
                         </div>
                         <div class="col-md-6">
                             <strong>Hết hạn:</strong><br>
-                            ${expiry}
+                            ${expiryFormatted}
                         </div>
                     </div>
                     <div class="row mt-2">
                         <div class="col-md-6">
                             <strong>Trạng thái:</strong><br>
-                            <span class="status-badge ${status.status === 'valid' ? 'status-valid' : status.status === 'expiring' ? 'status-expiring' : 'status-expired'}">
-                                ${status.status === 'valid' ? 'Còn hạn' : status.status === 'expiring' ? 'Sắp hết hạn' : 'Hết hạn'}
+                            <span class="status-badge ${result.status === 'valid' ? 'status-valid' : result.status === 'expiring' ? 'status-expiring' : 'status-expired'}">
+                                ${result.status === 'valid' ? 'Còn hạn' : result.status === 'expiring' ? 'Sắp hết hạn' : 'Hết hạn'}
                             </span>
                         </div>
                         <div class="col-md-6">
                             <strong>Thời gian còn lại:</strong><br>
-                            ${timeRemaining}
+                            ${result.time_remaining || 'N/A'}
                         </div>
                     </div>
-                    ${license.note ? `<div class="mt-2"><strong>Ghi chú:</strong> ${license.note}</div>` : ''}
+                    ${result.note ? `<div class="mt-2"><strong>Ghi chú:</strong> ${result.note}</div>` : ''}
                     <div class="mt-3">
-                        <strong>Verify URL:</strong>
+                        <strong>API URL:</strong>
                         <div class="verify-url mt-1">
-                            <code>${getVerifyUrl(key)}</code>
-                            <i class="bi bi-copy copy-btn float-end" onclick="copyToClipboard('${getVerifyUrl(key)}')"></i>
+                            <code>${getApiUrl(key)}</code>
+                            <i class="bi bi-copy copy-btn float-end" onclick="copyToClipboard('${getApiUrl(key)}')"></i>
                         </div>
                     </div>
                 </div>
@@ -978,9 +1133,9 @@ def verify_license(key):
             const container = document.getElementById('qrCodeContainer');
             container.innerHTML = '';
             
-            const verifyUrl = getVerifyUrl(key);
+            const apiUrl = getApiUrl(key);
             
-            QRCode.toCanvas(verifyUrl, { 
+            QRCode.toCanvas(apiUrl, { 
                 width: 200,
                 height: 200,
                 margin: 1,
@@ -999,7 +1154,7 @@ def verify_license(key):
                         ${canvas.outerHTML}
                     </div>
                     <div class="verify-url small">
-                        <code>${verifyUrl}</code>
+                        <code>${apiUrl}</code>
                     </div>
                     <button class="btn btn-sm btn-outline-primary mt-2" onclick="downloadQRCode('${key}')">
                         <i class="bi bi-download"></i> Tải QR Code
@@ -1010,7 +1165,6 @@ def verify_license(key):
 
         // Tải QR code
         function downloadQRCode(key) {
-            const verifyUrl = getVerifyUrl(key);
             const canvas = document.querySelector('#qrCodeContainer canvas');
             
             if (canvas) {
@@ -1021,15 +1175,78 @@ def verify_license(key):
             }
         }
 
-        // Lấy verify URL
-        function getVerifyUrl(key) {
-            return `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(key)}`;
+        // Lấy API URL
+        function getApiUrl(key) {
+            return `${window.location.origin}${window.location.pathname}?key=${encodeURIComponent(key)}&format=json`;
         }
 
-        // Hiển thị verify URL
-        function showVerifyUrl(key) {
-            const url = getVerifyUrl(key);
-            alert(`Verify URL cho license ${key}:\n\n${url}\n\nSao chép URL này để sử dụng trong ứng dụng khác.`);
+        // Hiển thị API URL
+        function showApiUrl(key) {
+            const url = getApiUrl(key);
+            alert(`API URL cho license ${key}:\n\n${url}\n\nSử dụng URL này để verify từ ứng dụng khác.`);
+        }
+
+        // Cập nhật API endpoints
+        function updateApiEndpoints() {
+            const baseUrl = `${window.location.origin}${window.location.pathname}`;
+            
+            // Hiển thị endpoint đúng
+            document.getElementById('apiEndpoint').textContent = `${baseUrl}?key={LICENSE_KEY}&format=json`;
+            document.getElementById('correctApiEndpoint').textContent = `${baseUrl}?key={LICENSE_KEY}&format=json`;
+            document.getElementById('apiTestUrl').textContent = `${baseUrl}?key={LICENSE_KEY}&format=json`;
+        }
+
+        // Test API
+        function testApi() {
+            const key = document.getElementById('testApiKey').value.trim().toUpperCase();
+            if (!key) {
+                alert('Vui lòng nhập license key để test');
+                return;
+            }
+            
+            const url = getApiUrl(key);
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const container = document.getElementById('apiResponseContainer');
+                    container.innerHTML = `
+                        <div class="api-response">
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-outline-success" onclick="copyToClipboard('${JSON.stringify(data, null, 2)}')">
+                                <i class="bi bi-copy"></i> Copy Response
+                            </button>
+                        </div>
+                    `;
+                })
+                .catch(error => {
+                    alert('Lỗi API call: ' + error.message);
+                });
+        }
+
+        // View API response
+        function viewApiResponse() {
+            const key = document.getElementById('testApiKey').value.trim().toUpperCase() || 'LIC-WBB61UL-F700';
+            const result = verifyLicenseApi(key);
+            
+            const container = document.getElementById('apiResponseContainer');
+            container.innerHTML = `
+                <div class="api-response">
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-success" onclick="copyToClipboard('${JSON.stringify(result, null, 2)}')">
+                        <i class="bi bi-copy"></i> Copy Response
+                    </button>
+                </div>
+            `;
         }
 
         // Copy to clipboard
@@ -1037,86 +1254,6 @@ def verify_license(key):
             navigator.clipboard.writeText(text).then(() => {
                 showToast('Đã sao chép vào clipboard!');
             });
-        }
-
-        // Cập nhật live endpoint
-        function updateLiveEndpoint() {
-            const endpoint = `${window.location.origin}${window.location.pathname}`;
-            document.getElementById('liveEndpoint').textContent = endpoint + '?verify={LICENSE_KEY}';
-            document.getElementById('verifyUrl').textContent = endpoint + '?key={LICENSE_KEY}';
-            document.getElementById('apiUrl').textContent = endpoint + '?verify={LICENSE_KEY}';
-        }
-
-        // Copy endpoint
-        function copyEndpoint() {
-            copyToClipboard(document.getElementById('liveEndpoint').textContent);
-        }
-
-        // Refresh endpoint
-        function refreshEndpoint() {
-            updateLiveEndpoint();
-            showToast('Đã làm mới endpoint!');
-        }
-
-        // Test API
-        function testApi() {
-            const key = prompt('Nhập license key để test API:');
-            if (!key) return;
-            
-            fetch(getVerifyUrl(key))
-                .then(response => response.json())
-                .then(data => {
-                    alert(JSON.stringify(data, null, 2));
-                })
-                .catch(error => {
-                    alert('Lỗi: ' + error.message);
-                });
-        }
-
-        // API endpoint cho verify từ app khác
-        // Đoạn code này sẽ được gọi khi có GET request với parameter ?verify=KEY
-        // Nó trả về JSON response
-        window.verifyLicenseApi = function(key) {
-            const license = licenses.find(l => l.key === key.toUpperCase());
-            const now = new Date();
-            
-            if (!license) {
-                return {
-                    valid: false,
-                    key: key,
-                    message: 'License không tồn tại',
-                    timestamp: now.toISOString()
-                };
-            }
-            
-            const status = getLicenseStatus(license.expiry);
-            const expiry = new Date(license.expiry);
-            
-            return {
-                valid: status.valid,
-                key: license.key,
-                expiry: license.expiry,
-                status: status.status,
-                message: status.valid ? 
-                    (status.status === 'expiring' ? 'License sắp hết hạn' : 'License hợp lệ') : 
-                    'License đã hết hạn',
-                days_remaining: status.days,
-                note: license.note || '',
-                timestamp: now.toISOString()
-            };
-        };
-
-        // Xử lý fetch request cho API
-        if (window.location.search.includes('verify=')) {
-            const urlParams = new URLSearchParams(window.location.search);
-            const key = urlParams.get('verify');
-            
-            const result = window.verifyLicenseApi(key);
-            
-            // Trả về JSON response
-            document.body.innerHTML = '';
-            document.write(JSON.stringify(result, null, 2));
-            document.close();
         }
 
         // Hiển thị toast
