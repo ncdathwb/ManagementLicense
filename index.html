@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>License Manager với Verify Online</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+        .header { border-bottom: 3px solid #f0f0f0; padding-bottom: 20px; margin-bottom: 30px; }
+        .nav-tabs .nav-link.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; }
+        .nav-tabs .nav-link { border: 1px solid #dee2e6; margin-right: 5px; border-radius: 5px 5px 0 0; }
+        .tab-pane { padding: 25px; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 10px 10px; }
+        .license-card { 
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        .license-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .license-key { 
+            font-family: 'Courier New', monospace; 
+            font-size: 1.1em; 
+            font-weight: bold; 
+            color: #2c3e50;
+            background: #f8f9fa;
+            padding: 5px 10px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        .status-valid { background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; }
+        .status-expiring { background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%); color: white; }
+        .status-expired { background: linear-gradient(135deg, #F44336 0%, #C62828 100%); color: white; }
+        .action-btn { width: 40px; height: 40px; border-radius: 50%; }
+        .verify-url { 
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+        .qr-code { 
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+            display: inline-block;
+            border: 1px solid #dee2e6;
+        }
+        .api-test-box { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 10px; 
+            border-left: 4px solid #667eea;
+        }
+        .highlight { background-color: #fffacd; padding: 2px 5px; border-radius: 3px; }
+        .copy-btn { cursor: pointer; transition: all 0.3s; }
+        .copy-btn:hover { transform: scale(1.1); }
+        .count-badge { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+        }
+        .empty-state { 
+            text-align: center; 
+            padding: 50px 20px; 
+            color: #6c757d;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px dashed #dee2e6;
+        }
+        .note-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="text-primary mb-2">
+                        <i class="bi bi-shield-check"></i> License Manager Pro
+                    </h1>
+                    <p class="text-muted mb-0">Quản lý license với tính năng verify online từ bất kỳ ứng dụng nào</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex justify-content-end align-items-center gap-2">
+                        <span id="totalLicenses" class="count-badge">0 license</span>
+                        <button class="btn btn-success" onclick="showAddModal()">
+                            <i class="bi bi-plus-lg"></i> Thêm License
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="manage-tab" data-bs-toggle="tab" data-bs-target="#manage" type="button">
+                    <i class="bi bi-list-check"></i> Quản lý License
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="verify-tab" data-bs-toggle="tab" data-bs-target="#verify" type="button">
+                    <i class="bi bi-search"></i> Verify License
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="api-tab" data-bs-toggle="tab" data-bs-target="#api" type="button">
+                    <i class="bi bi-code-slash"></i> API & Integration
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="myTabContent">
+            <!-- Tab 1: Quản lý License -->
+            <div class="tab-pane fade show active" id="manage" role="tabpanel">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm license key...">
+                            <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <select class="form-select" id="statusFilter" onchange="filterLicenses()">
+                            <option value="all">Tất cả trạng thái</option>
+                            <option value="valid">Còn hạn</option>
+                            <option value="expiring">Sắp hết hạn (≤ 7 ngày)</option>
+                            <option value="expired">Hết hạn</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Thống kê -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center p-3 bg-success bg-opacity-10 rounded">
+                            <i class="bi bi-check-circle-fill text-success fs-4 me-3"></i>
+                            <div>
+                                <h5 class="mb-0" id="validCount">0</h5>
+                                <small class="text-muted">Còn hạn</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center p-3 bg-warning bg-opacity-10 rounded">
+                            <i class="bi bi-exclamation-triangle-fill text-warning fs-4 me-3"></i>
+                            <div>
+                                <h5 class="mb-0" id="expiringCount">0</h5>
+                                <small class="text-muted">Sắp hết hạn</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center p-3 bg-danger bg-opacity-10 rounded">
+                            <i class="bi bi-x-circle-fill text-danger fs-4 me-3"></i>
+                            <div>
+                                <h5 class="mb-0" id="expiredCount">0</h5>
+                                <small class="text-muted">Hết hạn</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Danh sách License -->
+                <div id="licensesContainer">
+                    <!-- License cards sẽ được thêm bằng JavaScript -->
+                </div>
+
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <i class="bi bi-key fs-1 text-muted mb-3"></i>
+                    <h4>Chưa có license nào</h4>
+                    <p class="mb-4">Bắt đầu bằng cách thêm license đầu tiên của bạn</p>
+                    <button class="btn btn-primary" onclick="showAddModal()">
+                        <i class="bi bi-plus-lg"></i> Thêm License đầu tiên
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab 2: Verify License -->
+            <div class="tab-pane fade" id="verify" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <h4><i class="bi bi-search text-primary"></i> Verify License</h4>
+                            <p class="text-muted">Nhập license key để kiểm tra trạng thái</p>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="verifyKeyInput" 
+                                       placeholder="Nhập license key cần verify...">
+                                <button class="btn btn-primary" onclick="verifyLicense()">
+                                    <i class="bi bi-check-lg"></i> Verify
+                                </button>
+                            </div>
+                            <div id="verifyResult"></div>
+                        </div>
+
+                        <div class="note-box">
+                            <h6><i class="bi bi-lightbulb"></i> Cách sử dụng trong ứng dụng khác:</h6>
+                            <p class="mb-2">Sử dụng URL sau trong ứng dụng của bạn để verify license:</p>
+                            <div class="verify-url mb-2">
+                                <code id="verifyUrl">https://your-domain.com/verify.html?key=LICENSE_KEY_HERE</code>
+                            </div>
+                            <small class="text-muted">Thay thế LICENSE_KEY_HERE bằng key thực tế</small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <h4><i class="bi bi-qr-code text-primary"></i> QR Code Generator</h4>
+                            <p class="text-muted">Tạo QR code để verify nhanh từ điện thoại</p>
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="qrKeyInput" 
+                                       placeholder="Nhập license key để tạo QR code">
+                            </div>
+                            <button class="btn btn-outline-primary mb-3" onclick="generateQRCode()">
+                                <i class="bi bi-qr-code"></i> Tạo QR Code
+                            </button>
+                            <div id="qrCodeContainer" class="text-center"></div>
+                        </div>
+
+                        <div class="api-test-box">
+                            <h6><i class="bi bi-terminal"></i> Test API Endpoint</h6>
+                            <div class="mb-2">
+                                <small class="text-muted">GET Request:</small>
+                                <div class="verify-url">
+                                    <code id="apiUrl">window.location.origin + window.location.pathname + "?verify=LICENSE_KEY"</code>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-success" onclick="testApi()">
+                                <i class="bi bi-play-circle"></i> Test API Call
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: API & Integration -->
+            <div class="tab-pane fade" id="api" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4><i class="bi bi-plug text-primary"></i> Integration Guide</h4>
+                        
+                        <div class="mb-4">
+                            <h6>1. Verify trong Web App</h6>
+                            <pre class="bg-light p-3 rounded"><code>// JavaScript
+async function verifyLicense(key) {
+    const url = `${window.location.origin}${window.location.pathname}?verify=${key}`;
+    const response = await fetch(url);
+    const result = await response.json();
+    
+    if (result.valid) {
+        console.log('License hợp lệ đến:', result.expiry);
+    } else {
+        console.log('License không hợp lệ:', result.message);
+    }
+}</code></pre>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6>2. Verify trong Desktop/Mobile App</h6>
+                            <pre class="bg-light p-3 rounded"><code>// Python
+import requests
+import json
+
+def verify_license(key):
+    # Lưu file HTML này trên server
+    verify_url = "https://your-server.com/license-verify.html"
+    response = requests.get(f"{verify_url}?verify={key}")
+    data = json.loads(response.text)
+    
+    return data['valid'], data['message']</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h4><i class="bi bi-shield-check text-primary"></i> Live Verification</h4>
+                        
+                        <div class="mb-4">
+                            <h6>License Verification Endpoint</h6>
+                            <p class="text-muted">Endpoint này hoạt động từ bất kỳ domain nào</p>
+                            <div class="verify-url mb-2">
+                                <code id="liveEndpoint">Loading...</code>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-primary" onclick="copyEndpoint()">
+                                    <i class="bi bi-copy"></i> Copy Endpoint
+                                </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="refreshEndpoint()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6>Response Format</h6>
+                            <pre class="bg-light p-3 rounded"><code>{
+    "valid": true,
+    "key": "LICENSE-123",
+    "expiry": "2024-12-31T23:59:59",
+    "status": "active",
+    "message": "License hợp lệ",
+    "days_remaining": 45,
+    "timestamp": "2024-01-15T10:30:00"
+}</code></pre>
+                        </div>
+
+                        <div class="note-box">
+                            <h6><i class="bi bi-info-circle"></i> Lưu ý quan trọng:</h6>
+                            <ul class="mb-0">
+                                <li>Lưu file này trên web server để có thể truy cập từ bất kỳ đâu</li>
+                                <li>Sử dụng HTTPS để bảo mật</li>
+                                <li>Dữ liệu license được lưu trong localStorage của trình duyệt</li>
+                                <li>Để đồng bộ nhiều thiết bị, cần lưu file trên server</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal thêm/sửa license -->
+    <div class="modal fade" id="licenseModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Thêm License Mới</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="licenseForm" onsubmit="return saveLicense()">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">License Key *</label>
+                                    <input type="text" class="form-control" id="licenseKey" required
+                                           placeholder="VD: PRO-2024-ABC123-XYZ789"
+                                           pattern="[A-Z0-9\-]{10,50}"
+                                           title="Chỉ chấp nhận chữ hoa, số và dấu gạch ngang">
+                                    <div class="form-text">Sử dụng định dạng dễ nhận biết cho verify</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Thời gian hết hạn *</label>
+                                    <input type="datetime-local" class="form-control" id="expiryDate" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label class="form-label">Thông tin thêm (optional)</label>
+                                    <input type="text" class="form-control" id="licenseNote"
+                                           placeholder="Ghi chú, tên khách hàng, sản phẩm...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Thêm nhanh</label>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-outline-primary flex-fill" onclick="addDays(30)">
+                                            30 ngày
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary flex-fill" onclick="addDays(90)">
+                                            90 ngày
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary flex-fill" onclick="addDays(365)">
+                                            1 năm
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Actions</label>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-outline-secondary flex-fill" onclick="generateRandomKey()">
+                                            <i class="bi bi-shuffle"></i> Random Key
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary flex-fill" onclick="setNow()">
+                                            <i class="bi bi-clock"></i> Hết hạn ngay
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info" id="previewSection" style="display: none;">
+                            <h6><i class="bi bi-eye"></i> Preview</h6>
+                            <div id="previewContent"></div>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <h6><i class="bi bi-exclamation-triangle"></i> Lưu ý quan trọng:</h6>
+                            <ul class="mb-0 small">
+                                <li>License key sẽ được sử dụng để verify từ các ứng dụng khác</li>
+                                <li>Lưu file này lên web server để có thể verify online</li>
+                                <li>Dữ liệu được lưu trong trình duyệt hiện tại</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary" id="modalSaveBtn">Thêm License</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+    <script>
+        // Biến toàn cục
+        let licenses = [];
+        let currentEditKey = null;
+        const STORAGE_KEY = 'licenseManagerData';
+
+        // Khởi tạo khi trang được tải
+        document.addEventListener('DOMContentLoaded', function() {
+            loadLicenses();
+            renderLicenses();
+            updateStats();
+            updateLiveEndpoint();
+            
+            // Xử lý verify từ URL
+            handleUrlVerification();
+            
+            // Thêm event listeners
+            document.getElementById('expiryDate').addEventListener('change', updatePreview);
+            document.getElementById('licenseKey').addEventListener('input', updatePreview);
+        });
+
+        // Xử lý verify từ URL parameters
+        function handleUrlVerification() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const verifyKey = urlParams.get('verify');
+            
+            if (verifyKey) {
+                // Chuyển sang tab verify
+                const verifyTab = new bootstrap.Tab(document.getElementById('verify-tab'));
+                verifyTab.show();
+                
+                // Điền key và verify
+                document.getElementById('verifyKeyInput').value = verifyKey;
+                setTimeout(() => verifyLicense(), 500);
+                
+                // Xóa param để tránh verify lại khi refresh
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
+        }
+
+        // Tạo key ngẫu nhiên
+        function generateRandomKey() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let key = 'LIC-';
+            for (let i = 0; i < 8; i++) {
+                key += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            key += '-';
+            for (let i = 0; i < 4; i++) {
+                key += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            document.getElementById('licenseKey').value = key;
+            updatePreview();
+        }
+
+        // Lưu dữ liệu
+        function saveLicenses() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
+        }
+
+        // Tải dữ liệu
+        function loadLicenses() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            if (data) {
+                licenses = JSON.parse(data);
+            }
+        }
+
+        // Tính trạng thái
+        function getLicenseStatus(expiryDate) {
+            const expiry = new Date(expiryDate);
+            const now = new Date();
+            const diffTime = expiry - now;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffTime <= 0) {
+                return { status: 'expired', days: diffDays, valid: false };
+            } else if (diffDays <= 7) {
+                return { status: 'expiring', days: diffDays, valid: true };
+            } else {
+                return { status: 'valid', days: diffDays, valid: true };
+            }
+        }
+
+        // Định dạng thời gian
+        function formatDateTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('vi-VN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        // Format time remaining
+        function formatTimeRemaining(expiryDate) {
+            const expiry = new Date(expiryDate);
+            const now = new Date();
+            const diffMs = expiry - now;
+            
+            if (diffMs <= 0) return 'Đã hết hạn';
+            
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+            
+            if (diffDays > 0) {
+                return `${diffDays} ngày ${diffHours} giờ`;
+            } else if (diffHours > 0) {
+                return `${diffHours} giờ ${diffMinutes} phút`;
+            } else {
+                return `${diffMinutes} phút ${diffSeconds} giây`;
+            }
+        }
+
+        // Hiển thị modal thêm
+        function showAddModal() {
+            currentEditKey = null;
+            document.getElementById('modalTitle').textContent = 'Thêm License Mới';
+            document.getElementById('modalSaveBtn').textContent = 'Thêm License';
+            document.getElementById('licenseKey').value = '';
+            document.getElementById('licenseKey').readOnly = false;
+            document.getElementById('licenseNote').value = '';
+            
+            // Đặt thời gian mặc định
+            const defaultDate = new Date();
+            defaultDate.setDate(defaultDate.getDate() + 30);
+            defaultDate.setMinutes(defaultDate.getMinutes() - defaultDate.getTimezoneOffset());
+            document.getElementById('expiryDate').value = defaultDate.toISOString().slice(0, 16);
+            
+            document.getElementById('previewSection').style.display = 'none';
+            
+            const modal = new bootstrap.Modal(document.getElementById('licenseModal'));
+            modal.show();
+        }
+
+        // Hiển thị modal sửa
+        function showEditModal(key) {
+            const license = licenses.find(l => l.key === key);
+            if (!license) return;
+            
+            currentEditKey = key;
+            document.getElementById('modalTitle').textContent = 'Sửa License';
+            document.getElementById('modalSaveBtn').textContent = 'Cập nhật';
+            document.getElementById('licenseKey').value = license.key;
+            document.getElementById('licenseKey').readOnly = true;
+            document.getElementById('licenseNote').value = license.note || '';
+            
+            // Định dạng ngày
+            const expiryDate = new Date(license.expiry);
+            expiryDate.setMinutes(expiryDate.getMinutes() - expiryDate.getTimezoneOffset());
+            document.getElementById('expiryDate').value = expiryDate.toISOString().slice(0, 16);
+            
+            updatePreview();
+            
+            const modal = new bootstrap.Modal(document.getElementById('licenseModal'));
+            modal.show();
+        }
+
+        // Cập nhật preview
+        function updatePreview() {
+            const key = document.getElementById('licenseKey').value;
+            const expiry = document.getElementById('expiryDate').value;
+            
+            if (key && expiry) {
+                const expiryDate = new Date(expiry);
+                const status = getLicenseStatus(expiryDate);
+                
+                let statusText = '';
+                let statusClass = '';
+                
+                switch(status.status) {
+                    case 'valid':
+                        statusText = `Còn hạn (${status.days} ngày)`;
+                        statusClass = 'status-valid';
+                        break;
+                    case 'expiring':
+                        statusText = `Sắp hết hạn (${status.days} ngày)`;
+                        statusClass = 'status-expiring';
+                        break;
+                    case 'expired':
+                        statusText = 'Hết hạn';
+                        statusClass = 'status-expired';
+                        break;
+                }
+                
+                document.getElementById('previewContent').innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Key:</strong><br>
+                            <code class="license-key">${key}</code>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Hết hạn:</strong><br>
+                            ${formatDateTime(expiryDate)}
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <strong>Trạng thái:</strong><br>
+                            <span class="status-badge ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Còn lại:</strong><br>
+                            ${formatTimeRemaining(expiryDate)}
+                        </div>
+                    </div>
+                `;
+                document.getElementById('previewSection').style.display = 'block';
+            }
+        }
+
+        // Thêm ngày
+        function addDays(days) {
+            const date = new Date();
+            date.setDate(date.getDate() + days);
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            document.getElementById('expiryDate').value = date.toISOString().slice(0, 16);
+            updatePreview();
+        }
+
+        // Đặt thời gian hiện tại
+        function setNow() {
+            const date = new Date();
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            document.getElementById('expiryDate').value = date.toISOString().slice(0, 16);
+            updatePreview();
+        }
+
+        // Lưu license
+        function saveLicense() {
+            const key = document.getElementById('licenseKey').value.trim().toUpperCase();
+            const expiry = document.getElementById('expiryDate').value;
+            const note = document.getElementById('licenseNote').value.trim();
+            
+            if (!key || !expiry) {
+                alert('Vui lòng nhập đầy đủ thông tin');
+                return false;
+            }
+            
+            // Kiểm tra key trùng
+            if (!currentEditKey && licenses.some(l => l.key === key)) {
+                alert('License key đã tồn tại! Vui lòng chọn key khác.');
+                return false;
+            }
+            
+            const expiryDate = new Date(expiry);
+            
+            if (currentEditKey) {
+                // Cập nhật
+                const index = licenses.findIndex(l => l.key === currentEditKey);
+                if (index !== -1) {
+                    licenses[index].expiry = expiryDate.toISOString();
+                    licenses[index].note = note;
+                    licenses[index].updated = new Date().toISOString();
+                }
+            } else {
+                // Thêm mới
+                licenses.push({
+                    key: key,
+                    expiry: expiryDate.toISOString(),
+                    note: note,
+                    created: new Date().toISOString(),
+                    updated: new Date().toISOString()
+                });
+            }
+            
+            saveLicenses();
+            renderLicenses();
+            updateStats();
+            
+            const modal = bootstrap.Modal.getInstance(document.getElementById('licenseModal'));
+            modal.hide();
+            
+            showToast(currentEditKey ? 'Cập nhật thành công!' : 'Thêm license thành công!');
+            
+            return false;
+        }
+
+        // Xóa license
+        function deleteLicense(key) {
+            if (confirm(`Bạn có chắc chắn muốn xóa license "${key}"?`)) {
+                licenses = licenses.filter(l => l.key !== key);
+                saveLicenses();
+                renderLicenses();
+                updateStats();
+                showToast('Đã xóa license thành công!');
+            }
+        }
+
+        // Render licenses
+        function renderLicenses(filteredLicenses = null) {
+            const container = document.getElementById('licensesContainer');
+            const emptyState = document.getElementById('emptyState');
+            const data = filteredLicenses || licenses;
+            
+            if (data.length === 0) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                document.getElementById('totalLicenses').textContent = '0 license';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            document.getElementById('totalLicenses').textContent = `${data.length} license${data.length > 1 ? 's' : ''}`;
+            
+            let html = '';
+            data.forEach((license, index) => {
+                const status = getLicenseStatus(license.expiry);
+                const timeRemaining = formatTimeRemaining(license.expiry);
+                const created = formatDateTime(license.created);
+                const expiry = formatDateTime(license.expiry);
+                
+                let statusText = '';
+                let statusClass = '';
+                let icon = '';
+                
+                switch(status.status) {
+                    case 'valid':
+                        statusText = `Còn hạn (${status.days} ngày)`;
+                        statusClass = 'status-valid';
+                        icon = 'bi-check-circle-fill';
+                        break;
+                    case 'expiring':
+                        statusText = `Sắp hết hạn (${status.days} ngày)`;
+                        statusClass = 'status-expiring';
+                        icon = 'bi-exclamation-triangle-fill';
+                        break;
+                    case 'expired':
+                        statusText = 'Hết hạn';
+                        statusClass = 'status-expired';
+                        icon = 'bi-x-circle-fill';
+                        break;
+                }
+                
+                html += `
+                    <div class="license-card">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="${icon} me-2 text-${status.status}"></i>
+                                    <div>
+                                        <div class="license-key mb-1">${license.key}</div>
+                                        <small class="text-muted">Tạo: ${created}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div>
+                                    <small class="text-muted">Hết hạn:</small>
+                                    <div class="fw-bold">${expiry}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div>
+                                    <small class="text-muted">Trạng thái:</small>
+                                    <div><span class="status-badge ${statusClass}">${statusText}</span></div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div>
+                                    <small class="text-muted">Còn lại:</small>
+                                    <div class="${status.status === 'expired' ? 'text-danger' : 'text-success'}">
+                                        ${timeRemaining}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2 text-end">
+                                <button class="btn btn-sm btn-outline-primary action-btn me-1" 
+                                        onclick="showEditModal('${license.key}')" title="Sửa">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger action-btn me-1" 
+                                        onclick="deleteLicense('${license.key}')" title="Xóa">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-success action-btn" 
+                                        onclick="showVerifyUrl('${license.key}')" title="Verify URL">
+                                    <i class="bi bi-link"></i>
+                                </button>
+                            </div>
+                        </div>
+                        ${license.note ? `<div class="mt-2"><small><i class="bi bi-chat-left-text"></i> ${license.note}</small></div>` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Cập nhật thống kê
+        function updateStats() {
+            let valid = 0, expiring = 0, expired = 0;
+            
+            licenses.forEach(license => {
+                const status = getLicenseStatus(license.expiry).status;
+                if (status === 'valid') valid++;
+                else if (status === 'expiring') expiring++;
+                else if (status === 'expired') expired++;
+            });
+            
+            document.getElementById('validCount').textContent = valid;
+            document.getElementById('expiringCount').textContent = expiring;
+            document.getElementById('expiredCount').textContent = expired;
+        }
+
+        // Lọc licenses
+        function filterLicenses() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            
+            let filtered = licenses;
+            
+            if (searchTerm) {
+                filtered = filtered.filter(license => 
+                    license.key.toLowerCase().includes(searchTerm) ||
+                    (license.note && license.note.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            if (statusFilter !== 'all') {
+                filtered = filtered.filter(license => 
+                    getLicenseStatus(license.expiry).status === statusFilter
+                );
+            }
+            
+            renderLicenses(filtered);
+        }
+
+        // Xóa tìm kiếm
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('statusFilter').value = 'all';
+            filterLicenses();
+        }
+
+        // Verify license
+        function verifyLicense() {
+            const key = document.getElementById('verifyKeyInput').value.trim().toUpperCase();
+            if (!key) {
+                alert('Vui lòng nhập license key');
+                return;
+            }
+            
+            const license = licenses.find(l => l.key === key);
+            const resultDiv = document.getElementById('verifyResult');
+            
+            if (!license) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5><i class="bi bi-x-circle"></i> License không tồn tại</h5>
+                        <p class="mb-0">License key <strong>${key}</strong> không tìm thấy trong hệ thống.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const status = getLicenseStatus(license.expiry);
+            const expiry = formatDateTime(license.expiry);
+            const timeRemaining = formatTimeRemaining(license.expiry);
+            
+            let alertClass = '';
+            let icon = '';
+            let title = '';
+            
+            if (status.valid) {
+                alertClass = status.status === 'expiring' ? 'alert-warning' : 'alert-success';
+                icon = status.status === 'expiring' ? 'bi-exclamation-triangle' : 'bi-check-circle';
+                title = status.status === 'expiring' ? 'Sắp hết hạn' : 'License hợp lệ';
+            } else {
+                alertClass = 'alert-danger';
+                icon = 'bi-x-circle';
+                title = 'License đã hết hạn';
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="alert ${alertClass}">
+                    <h5><i class="bi ${icon}"></i> ${title}</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>License Key:</strong><br>
+                            <code class="license-key">${key}</code>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Hết hạn:</strong><br>
+                            ${expiry}
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <strong>Trạng thái:</strong><br>
+                            <span class="status-badge ${status.status === 'valid' ? 'status-valid' : status.status === 'expiring' ? 'status-expiring' : 'status-expired'}">
+                                ${status.status === 'valid' ? 'Còn hạn' : status.status === 'expiring' ? 'Sắp hết hạn' : 'Hết hạn'}
+                            </span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Thời gian còn lại:</strong><br>
+                            ${timeRemaining}
+                        </div>
+                    </div>
+                    ${license.note ? `<div class="mt-2"><strong>Ghi chú:</strong> ${license.note}</div>` : ''}
+                    <div class="mt-3">
+                        <strong>Verify URL:</strong>
+                        <div class="verify-url mt-1">
+                            <code>${getVerifyUrl(key)}</code>
+                            <i class="bi bi-copy copy-btn float-end" onclick="copyToClipboard('${getVerifyUrl(key)}')"></i>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Tạo QR code
+        function generateQRCode() {
+            const key = document.getElementById('qrKeyInput').value.trim().toUpperCase();
+            if (!key) {
+                alert('Vui lòng nhập license key');
+                return;
+            }
+            
+            const container = document.getElementById('qrCodeContainer');
+            container.innerHTML = '';
+            
+            const verifyUrl = getVerifyUrl(key);
+            
+            QRCode.toCanvas(verifyUrl, { 
+                width: 200,
+                height: 200,
+                margin: 1,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, function(error, canvas) {
+                if (error) {
+                    container.innerHTML = '<div class="alert alert-danger">Lỗi tạo QR code</div>';
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="mb-2">
+                        ${canvas.outerHTML}
+                    </div>
+                    <div class="verify-url small">
+                        <code>${verifyUrl}</code>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary mt-2" onclick="downloadQRCode('${key}')">
+                        <i class="bi bi-download"></i> Tải QR Code
+                    </button>
+                `;
+            });
+        }
+
+        // Tải QR code
+        function downloadQRCode(key) {
+            const verifyUrl = getVerifyUrl(key);
+            const canvas = document.querySelector('#qrCodeContainer canvas');
+            
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = `license-verify-${key}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+        }
+
+        // Lấy verify URL
+        function getVerifyUrl(key) {
+            return `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(key)}`;
+        }
+
+        // Hiển thị verify URL
+        function showVerifyUrl(key) {
+            const url = getVerifyUrl(key);
+            alert(`Verify URL cho license ${key}:\n\n${url}\n\nSao chép URL này để sử dụng trong ứng dụng khác.`);
+        }
+
+        // Copy to clipboard
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Đã sao chép vào clipboard!');
+            });
+        }
+
+        // Cập nhật live endpoint
+        function updateLiveEndpoint() {
+            const endpoint = `${window.location.origin}${window.location.pathname}`;
+            document.getElementById('liveEndpoint').textContent = endpoint + '?verify={LICENSE_KEY}';
+            document.getElementById('verifyUrl').textContent = endpoint + '?key={LICENSE_KEY}';
+            document.getElementById('apiUrl').textContent = endpoint + '?verify={LICENSE_KEY}';
+        }
+
+        // Copy endpoint
+        function copyEndpoint() {
+            copyToClipboard(document.getElementById('liveEndpoint').textContent);
+        }
+
+        // Refresh endpoint
+        function refreshEndpoint() {
+            updateLiveEndpoint();
+            showToast('Đã làm mới endpoint!');
+        }
+
+        // Test API
+        function testApi() {
+            const key = prompt('Nhập license key để test API:');
+            if (!key) return;
+            
+            fetch(getVerifyUrl(key))
+                .then(response => response.json())
+                .then(data => {
+                    alert(JSON.stringify(data, null, 2));
+                })
+                .catch(error => {
+                    alert('Lỗi: ' + error.message);
+                });
+        }
+
+        // API endpoint cho verify từ app khác
+        // Đoạn code này sẽ được gọi khi có GET request với parameter ?verify=KEY
+        // Nó trả về JSON response
+        window.verifyLicenseApi = function(key) {
+            const license = licenses.find(l => l.key === key.toUpperCase());
+            const now = new Date();
+            
+            if (!license) {
+                return {
+                    valid: false,
+                    key: key,
+                    message: 'License không tồn tại',
+                    timestamp: now.toISOString()
+                };
+            }
+            
+            const status = getLicenseStatus(license.expiry);
+            const expiry = new Date(license.expiry);
+            
+            return {
+                valid: status.valid,
+                key: license.key,
+                expiry: license.expiry,
+                status: status.status,
+                message: status.valid ? 
+                    (status.status === 'expiring' ? 'License sắp hết hạn' : 'License hợp lệ') : 
+                    'License đã hết hạn',
+                days_remaining: status.days,
+                note: license.note || '',
+                timestamp: now.toISOString()
+            };
+        };
+
+        // Xử lý fetch request cho API
+        if (window.location.search.includes('verify=')) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const key = urlParams.get('verify');
+            
+            const result = window.verifyLicenseApi(key);
+            
+            // Trả về JSON response
+            document.body.innerHTML = '';
+            document.write(JSON.stringify(result, null, 2));
+            document.close();
+        }
+
+        // Hiển thị toast
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'position-fixed bottom-0 end-0 p-3';
+            toast.style.zIndex = '11';
+            
+            toast.innerHTML = `
+                <div class="toast show" role="alert">
+                    <div class="toast-header bg-success text-white">
+                        <i class="bi bi-check-circle me-2"></i>
+                        <strong class="me-auto">Thành công</strong>
+                        <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
