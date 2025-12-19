@@ -1992,8 +1992,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
             const diffMs = expiry - now;
             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
             
-            // Nếu days_remaining <= 0 (số âm hoặc 0) hoặc diffMs <= 0 thì đã hết hạn
-            if (diffDays <= 0 || diffMs <= 0) return 'Đã hết hạn';
+            // Hết hạn chỉ khi đã qua thời điểm expiry
+            if (diffMs <= 0) return 'Đã hết hạn';
             
             const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -2045,8 +2045,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
             const diffMs = expiry - now;
             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
             
-            // Nếu days_remaining <= 0 (số âm hoặc 0) hoặc diffMs <= 0 thì đã hết hạn
-            if (diffDays <= 0 || diffMs <= 0) {
+            // Hết hạn chỉ khi đã qua thời điểm expiry
+            if (diffMs <= 0) {
                 element.textContent = 'Đã hết hạn';
                 element.className = 'text-danger fw-bold';
                 // Dừng interval khi hết hạn
