@@ -27,6 +27,7 @@ export default async function handler(req, res) {
     // Đọc licenses: kết hợp KV, file, và static fallback để tránh mất key khi KV chưa sync
     let licensesFromKv = [];
     let licensesFromFile = [];
+    let licensesFromGitHub = [];
     const licensesFromStatic = Array.isArray(staticFallbackLicenses) ? staticFallbackLicenses : [];
 
     // 1) Đọc từ Vercel KV (nếu có)
@@ -61,12 +62,37 @@ export default async function handler(req, res) {
       console.error('[VERIFY] Error reading licenses.json:', fileError);
     }
 
+    // 3) Đọc từ GitHub raw (public) để lấy bản mới nhất nếu KV chưa có hoặc sync GitHub thất bại
+    try {
+      const fetch = require('node-fetch');
+      const owner = process.env.GITHUB_REPO_OWNER || 'ncdathwb';
+      const repo = process.env.GITHUB_REPO_NAME || 'ManagementLicense';
+      const branch = process.env.GITHUB_REPO_BRANCH || 'main';
+      const githubUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/licenses.json`;
+      const ghResp = await fetch(githubUrl, { timeout: 7000 });
+      if (ghResp.ok) {
+        const ghText = await ghResp.text();
+        const ghJson = JSON.parse(ghText);
+        if (Array.isArray(ghJson) && ghJson.length > 0) {
+          licensesFromGitHub = ghJson;
+          console.log('[VERIFY] Loaded licenses from GitHub raw:', ghJson.length);
+        }
+      } else {
+        console.log('[VERIFY] GitHub raw fetch status:', ghResp.status);
+      }
+    } catch (e) {
+      console.log('[VERIFY] Cannot load licenses from GitHub raw:', e.message);
+    }
+
     // 3) Gộp: ưu tiên KV (nếu có), nếu KV thiếu key thì lấy từ file, cuối cùng lấy static
     const licenseMap = new Map();
     for (const lic of licensesFromStatic) {
       if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
     }
     for (const lic of licensesFromFile) {
+      if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
+    }
+    for (const lic of licensesFromGitHub) {
       if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
     }
     for (const lic of licensesFromKv) {
