@@ -3102,8 +3102,9 @@ public class LicenseInterceptor implements HandlerInterceptor {
         let verifyUrlModalEl = null;
 
         // Lấy verify URL
+        // Trả về endpoint API verify trực tiếp thay vì trang HTML
         function getVerifyUrl(key) {
-            return `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(key)}`;
+            return `${window.location.origin}/api/verify?verify=${encodeURIComponent(key)}`;
         }
 
         // Hiển thị verify URL
