@@ -1960,11 +1960,10 @@ public class LicenseInterceptor implements HandlerInterceptor {
             const expiry = new Date(expiryDate);
             const now = new Date();
             const diffTime = expiry - now;
-            // Dùng Math.floor để tính chính xác số ngày (có thể âm nếu đã hết hạn)
             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
             
-            // Nếu days_remaining <= 0 (số âm hoặc 0) thì key hết hạn
-            if (diffDays <= 0 || diffTime <= 0) {
+            // Hết hạn khi đã qua thời điểm hết hạn (diffTime <= 0)
+            if (diffTime <= 0) {
                 return { status: 'expired', days: diffDays, valid: false };
             } else if (diffDays <= 7) {
                 return { status: 'expiring', days: diffDays, valid: true };
