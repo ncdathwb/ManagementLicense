@@ -2142,6 +2142,9 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         break;
                 }
                 
+                // Nếu đã hết hạn thì hiển thị "Đã hết hạn", không gọi formatTimeRemaining
+                const timeRemainingPreview = status.status === 'expired' ? 'Đã hết hạn' : formatTimeRemaining(expiryDate);
+                
                 document.getElementById('previewContent').innerHTML = `
                     <div class="row">
                         <div class="col-md-6">
@@ -2160,7 +2163,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         </div>
                         <div class="col-md-6">
                             <strong>Còn lại:</strong><br>
-                            ${formatTimeRemaining(expiryDate)}
+                            ${timeRemainingPreview}
                         </div>
                     </div>
                 `;
@@ -2430,7 +2433,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
             paginatedData.forEach((license, index) => {
                 const globalIndex = startIndex + index;
                 const status = getLicenseStatus(license.expiry);
-                const timeRemaining = formatTimeRemaining(license.expiry);
+                // Nếu đã hết hạn thì hiển thị "Đã hết hạn", không gọi formatTimeRemaining
+                const timeRemaining = status.status === 'expired' ? 'Đã hết hạn' : formatTimeRemaining(license.expiry);
                 const created = formatDateTime(license.created);
                 const expiry = formatDateTime(license.expiry);
                 
@@ -2858,7 +2862,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
             
             const status = getLicenseStatus(license.expiry);
             const expiry = formatDateTime(license.expiry);
-            const timeRemaining = formatTimeRemaining(license.expiry);
+            // Nếu đã hết hạn thì hiển thị "Đã hết hạn", không gọi formatTimeRemaining
+            const timeRemaining = status.status === 'expired' ? 'Đã hết hạn' : formatTimeRemaining(license.expiry);
             
             let alertClass = '';
             let icon = '';
