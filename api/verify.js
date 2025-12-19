@@ -1,4 +1,12 @@
 // Vercel Serverless Function để verify license và trả về JSON
+// Static fallback to ensure license list luôn có sẵn (dù KV hay fs lỗi)
+let staticFallbackLicenses = [];
+try {
+  staticFallbackLicenses = require('../licenses.json');
+} catch (e) {
+  staticFallbackLicenses = [];
+}
+
 export default async function handler(req, res) {
   // Chỉ cho phép GET request
   if (req.method !== 'GET') {
@@ -16,9 +24,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Đọc licenses: kết hợp KV và file để tránh mất key khi KV chưa sync
+    // Đọc licenses: kết hợp KV, file, và static fallback để tránh mất key khi KV chưa sync
     let licensesFromKv = [];
     let licensesFromFile = [];
+    const licensesFromStatic = Array.isArray(staticFallbackLicenses) ? staticFallbackLicenses : [];
 
     // 1) Đọc từ Vercel KV (nếu có)
     try {
@@ -52,13 +61,16 @@ export default async function handler(req, res) {
       console.error('[VERIFY] Error reading licenses.json:', fileError);
     }
 
-    // 3) Gộp: ưu tiên KV (nếu có), nhưng nếu KV thiếu key thì lấy từ file
+    // 3) Gộp: ưu tiên KV (nếu có), nếu KV thiếu key thì lấy từ file, cuối cùng lấy static
     const licenseMap = new Map();
+    for (const lic of licensesFromStatic) {
+      if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
+    }
     for (const lic of licensesFromFile) {
-      if (lic && lic.key) licenseMap.set(String(lic.key).toUpperCase(), lic);
+      if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
     }
     for (const lic of licensesFromKv) {
-      if (lic && lic.key) licenseMap.set(String(lic.key).toUpperCase(), lic);
+      if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
     }
     const licenses = Array.from(licenseMap.values());
 
