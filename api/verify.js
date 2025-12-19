@@ -15,31 +15,39 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Đọc licenses từ Vercel KV hoặc fallback về file JSON
+    // Đọc licenses từ file JSON trước (ưu tiên), sau đó mới thử Vercel KV
     let licenses = [];
     
-    // Thử đọc từ Vercel KV trước (nếu có)
+    // Ưu tiên đọc từ file JSON (luôn có trong repo)
     try {
-      const { kv } = require('@vercel/kv');
-      if (kv) {
-        const kvData = await kv.get('licenses');
-        if (kvData) {
-          licenses = Array.isArray(kvData) ? kvData : [];
+      const fs = require('fs');
+      const path = require('path');
+      const licensesPath = path.join(process.cwd(), 'licenses.json');
+      
+      if (fs.existsSync(licensesPath)) {
+        const data = fs.readFileSync(licensesPath, 'utf8');
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          licenses = parsed;
         }
       }
-    } catch (e) {
-      // Nếu không có Vercel KV, fallback về file JSON
+    } catch (fileError) {
+      console.error('Error reading licenses.json:', fileError);
+    }
+    
+    // Nếu file JSON trống hoặc không có, thử đọc từ Vercel KV (nếu có)
+    if (licenses.length === 0) {
       try {
-        const fs = require('fs');
-        const path = require('path');
-        const licensesPath = path.join(process.cwd(), 'licenses.json');
-        
-        if (fs.existsSync(licensesPath)) {
-          const data = fs.readFileSync(licensesPath, 'utf8');
-          licenses = JSON.parse(data);
+        const { kv } = require('@vercel/kv');
+        if (kv) {
+          const kvData = await kv.get('licenses');
+          if (kvData && Array.isArray(kvData) && kvData.length > 0) {
+            licenses = kvData;
+          }
         }
-      } catch (fileError) {
-        console.error('Error reading licenses.json:', fileError);
+      } catch (e) {
+        // Vercel KV không khả dụng, giữ licenses = []
+        console.error('Vercel KV not available:', e);
       }
     }
 
