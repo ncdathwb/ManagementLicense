@@ -632,9 +632,6 @@ def verify_license(key):
                                 <button class="btn btn-sm btn-outline-primary" onclick="copyEndpoint()">
                                     <i class="bi bi-copy"></i> Copy Endpoint
                                 </button>
-                                <button class="btn btn-sm btn-success" onclick="if(downloadLicensesJson()) { showToast('✅ Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub để API verify hoạt động!', 'success', 5000); }">
-                                    <i class="bi bi-download"></i> Download licenses.json
-                                </button>
                                 <button class="btn btn-sm btn-outline-success" onclick="refreshEndpoint()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
@@ -1080,40 +1077,35 @@ def verify_license(key):
                     body: JSON.stringify({ licenses: licenses })
                 });
                 const result = await response.json();
+                console.log('[SYNC] Full response:', result);
+                
                 if (result.success) {
-                    console.log('[SYNC] Licenses synced to server:', result);
-                    
-                    // Nếu sync vào Vercel KV thành công -> không cần download file
+                    // Nếu sync vào Vercel KV thành công
                     if (result.message && result.message.includes('Vercel KV')) {
                         showToast('✅ Đã cập nhật license lên server (Vercel KV). API verify sẽ dùng dữ liệu mới ngay lập tức!', 'success', 4000);
                     } 
-                    // Nếu phải dùng file JSON -> LUÔN download để commit thủ công
+                    // Nếu commit GitHub thành công -> hoàn toàn tự động
+                    else if (result.commit && result.commit.sha) {
+                        const commitUrl = result.commit.url || '#';
+                        showToast(`✅ Đã tự động commit licenses.json lên GitHub! API verify sẽ dùng dữ liệu mới ngay lập tức.`, 'success', 5000);
+                        console.log('[SYNC] GitHub commit successful:', result.commit);
+                    }
+                    // Nếu commit GitHub fail hoặc không có token -> báo lỗi
                     else {
-                        // Luôn download file JSON để đảm bảo có file mới nhất để commit
-                        if (licenses.length > 0) {
-                            setTimeout(() => {
-                                if (downloadLicensesJson()) {
-                                    if (result.message && result.message.includes('commit')) {
-                                        showToast('⚠️ Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub để API verify hoạt động với dữ liệu mới!', 'warning', 6000);
-                                    } else {
-                                        showToast('✅ Đã cập nhật và tải xuống licenses.json. Vui lòng commit file này lên GitHub!', 'success', 5000);
-                                    }
-                                } else {
-                                    showToast('⚠️ Sync thành công nhưng không thể tải file. Vui lòng kiểm tra console để xem JSON content.', 'warning', 6000);
-                                }
-                            }, 500);
-                        }
+                        const errorMsg = result.error || 'Unknown error';
+                        const details = result.details || {};
+                        showToast(`⚠️ Commit tự động thất bại: ${errorMsg}. Vui lòng kiểm tra GITHUB_TOKEN trong Vercel. Xem console để biết chi tiết.`, 'error', 10000);
+                        console.error('[SYNC] Auto-commit failed:', {
+                            error: errorMsg,
+                            details: details,
+                            github_status: result.github_status
+                        });
                     }
                 } else {
-                    // Nếu sync fail, vẫn download file JSON
+                    // Nếu sync fail
+                    const errorMsg = result.error || result.message || 'Unknown error';
+                    showToast(`❌ Sync thất bại: ${errorMsg}. Vui lòng kiểm tra console để biết chi tiết.`, 'error', 8000);
                     console.error('[SYNC] Sync failed:', result);
-                    if (licenses.length > 0) {
-                        setTimeout(() => {
-                            if (downloadLicensesJson()) {
-                                showToast('⚠️ Sync thất bại nhưng đã tải xuống licenses.json. Vui lòng commit file này lên GitHub!', 'warning', 6000);
-                            }
-                        }, 500);
-                    }
                 }
             } catch (e) {
                 // Không báo lỗi nếu sync fail (có thể chưa có API endpoint)
@@ -1121,37 +1113,6 @@ def verify_license(key):
             }
         }
 
-        // Tự động download file licenses.json để commit lên GitHub
-        // QUAN TRỌNG: File này cần được commit lên GitHub để API verify có thể đọc dữ liệu mới
-        function downloadLicensesJson() {
-            try {
-                const jsonContent = JSON.stringify(licenses, null, 2);
-                const blob = new Blob([jsonContent], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = 'licenses.json';
-                link.style.display = 'none'; // Ẩn link
-                document.body.appendChild(link);
-                link.click();
-                
-                // Cleanup sau 100ms
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                }, 100);
-                
-                console.log('[DOWNLOAD] licenses.json đã được tải xuống. Vui lòng commit file này lên GitHub.');
-                console.log('[DOWNLOAD] Số lượng licenses:', licenses.length);
-                return true;
-            } catch (e) {
-                console.error('[DOWNLOAD] Lỗi khi tải file licenses.json:', e);
-                showToast('Lỗi khi tải file licenses.json. Vui lòng thử lại hoặc copy JSON từ console.', 'error');
-                // Fallback: In JSON ra console để user có thể copy
-                console.log('[DOWNLOAD] JSON Content:', JSON.stringify(licenses, null, 2));
-                return false;
-            }
-        }
 
         // Hàm lưu và sync licenses
         // QUAN TRỌNG: Hàm này được gọi sau MỌI thay đổi license (thêm, sửa, xóa)
@@ -1162,20 +1123,11 @@ def verify_license(key):
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
                 console.log('[SAVE] Đã lưu vào localStorage. Số lượng licenses:', licenses.length);
                 
-                // Bước 2: BẮT BUỘC sync lên server để cập nhật JSON/Vercel KV
-                // Mọi thay đổi license (thêm, sửa, xóa) đều phải sync để API verify có dữ liệu mới
+                // Bước 2: BẮT BUỘC sync lên server để tự động commit lên GitHub
+                // Mọi thay đổi license (thêm, sửa, xóa) đều phải sync để tự động commit lên GitHub
                 syncLicensesToServer().catch((error) => {
                     console.error('[SAVE] Lỗi khi sync lên server:', error);
-                    // Fallback: Nếu sync fail, vẫn download file JSON để user có thể commit thủ công
-                    setTimeout(() => {
-                        if (licenses.length > 0) {
-                            if (downloadLicensesJson()) {
-                                showToast('⚠️ Sync tự động thất bại. Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub để API verify hoạt động!', 'warning', 7000);
-                            } else {
-                                showToast('⚠️ Sync thất bại và không thể tải file. Vui lòng dùng nút "Download licenses.json" để tải thủ công.', 'error', 7000);
-                            }
-                        }
-                    }, 500);
+                    showToast('❌ Sync tự động thất bại. Vui lòng kiểm tra cấu hình GITHUB_TOKEN trong Vercel hoặc xem console để biết chi tiết.', 'error', 8000);
                 });
             } catch (e) {
                 console.error('Error saving licenses to localStorage:', e);
