@@ -2019,8 +2019,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     clearInterval(countdownIntervals[licenseKey]);
                     delete countdownIntervals[licenseKey];
                 }
-                // Re-render để cập nhật status
-                renderLicenses();
+                // KHÔNG gọi renderLicenses() ở đây để tránh loop và conflict
+                // Status đã được cập nhật đúng trong renderLicenses()
                 return;
             }
             const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -2527,6 +2527,9 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 `;
             });
             
+            // Dừng tất cả countdown intervals trước khi render lại để tránh conflict
+            stopAllCountdowns();
+            
             container.innerHTML = html;
             
             // Khởi động realtime countdown cho licenses trong trang hiện tại
@@ -2534,8 +2537,16 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 const globalIndex = startIndex + index;
                 const licenseStatus = getLicenseStatus(license.expiry);
                 const countdownId = `countdown_${license.key}_${globalIndex}`;
+                // Chỉ khởi động countdown cho license chưa hết hạn
                 if (licenseStatus.status !== 'expired') {
                     startRealtimeCountdown(license.key, license.expiry, countdownId);
+                } else {
+                    // Đảm bảo element hiển thị "Đã hết hạn" và không có interval nào chạy
+                    const element = document.getElementById(countdownId);
+                    if (element) {
+                        element.textContent = 'Đã hết hạn';
+                        element.className = 'text-danger fw-bold';
+                    }
                 }
             });
             
