@@ -1832,8 +1832,12 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 console.log('[SYNC] Full response:', result);
                 
                 if (result.success) {
-                    // Thành công: không show toast để tránh trùng với toast lưu/sửa.
-                    // Chỉ log để theo dõi.
+                    const syncedToKV = result.message && result.message.includes('Vercel KV');
+                    const committedToGit = result.commit && result.commit.sha;
+                    if (!syncedToKV && !committedToGit) {
+                        // Không lưu được lên server/GitHub -> cảnh báo để biết dữ liệu chỉ ở local
+                        showToast('⚠️ Sync chưa lưu lên server. Dữ liệu chỉ tồn tại trên thiết bị này. Vui lòng kiểm tra cấu hình GITHUB_TOKEN/Vercel KV.', 'warning', 8000);
+                    }
                     console.log('[SYNC] Sync success:', result);
                 } else {
                     // Nếu sync fail
@@ -1843,6 +1847,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 }
             } catch (e) {
                 // Không báo lỗi nếu sync fail (có thể chưa có API endpoint)
+                showToast('⚠️ Không thể sync lên server. Dữ liệu chỉ ở thiết bị này (offline?).', 'warning', 6000);
                 console.log('[SYNC] Sync to server skipped (optional):', e.message);
             }
         }
@@ -1872,57 +1877,61 @@ public class LicenseInterceptor implements HandlerInterceptor {
         // Tải dữ liệu từ server (GitHub) hoặc localStorage
         async function loadLicenses() {
             // Ưu tiên load từ GitHub raw URL để đồng bộ giữa các thiết bị
+            let serverLicenses = [];
             try {
-                // GitHub raw URL - cần cập nhật theo repo của bạn
                 const githubRawUrl = 'https://raw.githubusercontent.com/ncdathwb/ManagementLicense/main/licenses.json';
-                
                 const response = await fetch(githubRawUrl, {
                     method: 'GET',
-                    cache: 'no-cache', // Luôn fetch dữ liệu mới nhất
-                    headers: {
-                        'Accept': 'application/json'
-                    }
+                    cache: 'no-cache',
+                    headers: { 'Accept': 'application/json' }
                 });
-                
                 if (response.ok) {
-                    const serverLicenses = await response.json();
-                    if (Array.isArray(serverLicenses) && serverLicenses.length > 0) {
-                        licenses = serverLicenses;
-                        // Sync vào localStorage để cache
-                        try {
-                            localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
-                            lastLicensesSnapshot = JSON.stringify(licenses);
-                            console.log('[LOAD] Loaded licenses from GitHub:', licenses.length);
-                        } catch (e) {
-                            console.warn('[LOAD] Could not save to localStorage:', e);
-                        }
-                        return; // Thành công, không cần fallback
+                    const json = await response.json();
+                    if (Array.isArray(json)) {
+                        serverLicenses = json;
+                        console.log('[LOAD] Loaded licenses from GitHub:', serverLicenses.length);
                     }
                 }
             } catch (e) {
-                console.log('[LOAD] Could not load from GitHub, falling back to localStorage:', e.message);
+                console.log('[LOAD] Could not load from GitHub, will try localStorage:', e.message);
             }
-            
-            // Fallback: Load từ localStorage nếu không load được từ server
+
+            // Load localStorage (để merge nếu có dữ liệu chưa sync)
+            let localLicenses = [];
             try {
                 const data = localStorage.getItem(STORAGE_KEY);
                 if (data) {
-                    licenses = JSON.parse(data);
-                    // Lưu snapshot để phát hiện thay đổi sau này
-                    lastLicensesSnapshot = data;
-                    // Validate data structure
-                    if (!Array.isArray(licenses)) {
-                        licenses = [];
+                    const parsed = JSON.parse(data);
+                    if (Array.isArray(parsed)) {
+                        localLicenses = parsed;
                     }
-                    console.log('[LOAD] Loaded licenses from localStorage:', licenses.length);
-                } else {
-                    licenses = [];
-                    console.log('[LOAD] No licenses found in localStorage');
                 }
             } catch (e) {
-                console.error('[LOAD] Error loading licenses from localStorage:', e);
-                licenses = [];
+                console.warn('[LOAD] Error reading localStorage:', e);
             }
+
+            // Merge: ưu tiên dữ liệu từ server, thêm những key chưa có từ local
+            const map = new Map();
+            serverLicenses.forEach(item => {
+                if (item && item.key) map.set(item.key, item);
+            });
+            localLicenses.forEach(item => {
+                if (item && item.key && !map.has(item.key)) {
+                    map.set(item.key, item);
+                }
+            });
+
+            licenses = Array.from(map.values());
+
+            // Lưu snapshot vào localStorage để cache
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
+                lastLicensesSnapshot = JSON.stringify(licenses);
+            } catch (e) {
+                console.warn('[LOAD] Could not save merged data to localStorage:', e);
+            }
+
+            console.log('[LOAD] Final licenses after merge:', licenses.length);
         }
 
         // Tự động refresh UI khi localStorage thay đổi (cùng tab hoặc tab khác)
