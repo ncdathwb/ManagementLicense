@@ -1824,27 +1824,9 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 console.log('[SYNC] Full response:', result);
                 
                 if (result.success) {
-                    // Nếu sync vào Vercel KV thành công
-                    if (result.message && result.message.includes('Vercel KV')) {
-                        showToast('✅ Đã cập nhật license lên server (Vercel KV). API verify sẽ dùng dữ liệu mới ngay lập tức!', 'success', 4000);
-                    } 
-                    // Nếu commit GitHub thành công -> hoàn toàn tự động
-                    else if (result.commit && result.commit.sha) {
-                        const commitUrl = result.commit.url || '#';
-                        showToast(`✅ Đã tự động commit licenses.json lên GitHub! API verify sẽ dùng dữ liệu mới ngay lập tức.`, 'success', 5000);
-                        console.log('[SYNC] GitHub commit successful:', result.commit);
-                    }
-                    // Nếu commit GitHub fail hoặc không có token -> báo lỗi
-                    else {
-                        const errorMsg = result.error || 'Unknown error';
-                        const details = result.details || {};
-                        showToast(`⚠️ Commit tự động thất bại: ${errorMsg}. Vui lòng kiểm tra GITHUB_TOKEN trong Vercel. Xem console để biết chi tiết.`, 'error', 10000);
-                        console.error('[SYNC] Auto-commit failed:', {
-                            error: errorMsg,
-                            details: details,
-                            github_status: result.github_status
-                        });
-                    }
+                    // Thành công: không show toast để tránh trùng với toast lưu/sửa.
+                    // Chỉ log để theo dõi.
+                    console.log('[SYNC] Sync success:', result);
                 } else {
                     // Nếu sync fail
                     const errorMsg = result.error || result.message || 'Unknown error';
