@@ -15,39 +15,41 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Đọc licenses từ file JSON trước (ưu tiên), sau đó mới thử Vercel KV
+    // Đọc licenses: ƯU TIÊN Vercel KV (dữ liệu mới nhất từ sync), sau đó mới fallback về file JSON
     let licenses = [];
     
-    // Ưu tiên đọc từ file JSON (luôn có trong repo)
+    // ƯU TIÊN: Đọc từ Vercel KV trước (dữ liệu được sync mới nhất)
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const licensesPath = path.join(process.cwd(), 'licenses.json');
-      
-      if (fs.existsSync(licensesPath)) {
-        const data = fs.readFileSync(licensesPath, 'utf8');
-        const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          licenses = parsed;
+      const { kv } = require('@vercel/kv');
+      if (kv) {
+        const kvData = await kv.get('licenses');
+        if (kvData && Array.isArray(kvData) && kvData.length > 0) {
+          licenses = kvData;
+          console.log('[VERIFY] Loaded licenses from Vercel KV:', kvData.length);
         }
       }
-    } catch (fileError) {
-      console.error('Error reading licenses.json:', fileError);
+    } catch (e) {
+      // Vercel KV không khả dụng, sẽ fallback về file
+      console.log('[VERIFY] Vercel KV not available, falling back to file:', e.message);
     }
     
-    // Nếu file JSON trống hoặc không có, thử đọc từ Vercel KV (nếu có)
+    // FALLBACK: Nếu Vercel KV trống hoặc không có, đọc từ file JSON (trong repo)
     if (licenses.length === 0) {
       try {
-        const { kv } = require('@vercel/kv');
-        if (kv) {
-          const kvData = await kv.get('licenses');
-          if (kvData && Array.isArray(kvData) && kvData.length > 0) {
-            licenses = kvData;
+        const fs = require('fs');
+        const path = require('path');
+        const licensesPath = path.join(process.cwd(), 'licenses.json');
+        
+        if (fs.existsSync(licensesPath)) {
+          const data = fs.readFileSync(licensesPath, 'utf8');
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            licenses = parsed;
+            console.log('[VERIFY] Loaded licenses from file:', parsed.length);
           }
         }
-      } catch (e) {
-        // Vercel KV không khả dụng, giữ licenses = []
-        console.error('Vercel KV not available:', e);
+      } catch (fileError) {
+        console.error('[VERIFY] Error reading licenses.json:', fileError);
       }
     }
 
@@ -69,7 +71,7 @@ export default async function handler(req, res) {
     // Tính toán trạng thái
     const expiry = new Date(license.expiry);
     const diffTime = expiry - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     let status, valid;
     if (diffTime <= 0) {

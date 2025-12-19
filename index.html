@@ -632,6 +632,9 @@ def verify_license(key):
                                 <button class="btn btn-sm btn-outline-primary" onclick="copyEndpoint()">
                                     <i class="bi bi-copy"></i> Copy Endpoint
                                 </button>
+                                <button class="btn btn-sm btn-success" onclick="downloadLicensesJson(); showToast('Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub.')">
+                                    <i class="bi bi-download"></i> Export licenses.json
+                                </button>
                                 <button class="btn btn-sm btn-outline-success" onclick="refreshEndpoint()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
@@ -1079,6 +1082,23 @@ def verify_license(key):
                 const result = await response.json();
                 if (result.success) {
                     console.log('[SYNC] Licenses synced to server:', result);
+                    
+                    // Nếu sync vào Vercel KV thành công -> không cần download file
+                    if (result.message && result.message.includes('Vercel KV')) {
+                        showToast('✅ Đã cập nhật license lên server (Vercel KV). API verify sẽ dùng dữ liệu mới ngay lập tức!', 'success', 4000);
+                    } 
+                    // Nếu phải dùng file JSON -> cần download và commit
+                    else if (result.message && (result.message.includes('licenses.json') || result.message.includes('commit'))) {
+                        if (licenses.length > 0) {
+                            setTimeout(() => {
+                                if (downloadLicensesJson()) {
+                                    showToast('⚠️ Đã sync và tải xuống licenses.json. Vui lòng commit file này lên GitHub để API verify hoạt động với dữ liệu mới!', 'warning', 6000);
+                                }
+                            }, 500);
+                        }
+                    } else {
+                        showToast('✅ Đã cập nhật license thành công!', 'success', 3000);
+                    }
                 }
             } catch (e) {
                 // Không báo lỗi nếu sync fail (có thể chưa có API endpoint)
@@ -1086,12 +1106,47 @@ def verify_license(key):
             }
         }
 
+        // Tự động download file licenses.json để commit lên GitHub
+        function downloadLicensesJson() {
+            try {
+                const jsonContent = JSON.stringify(licenses, null, 2);
+                const blob = new Blob([jsonContent], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'licenses.json';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                console.log('[DOWNLOAD] licenses.json đã được tải xuống. Vui lòng commit file này lên GitHub.');
+                return true;
+            } catch (e) {
+                console.error('[DOWNLOAD] Lỗi khi tải file licenses.json:', e);
+                showToast('Lỗi khi tải file licenses.json', 'error');
+                return false;
+            }
+        }
+
+        // Hàm lưu và sync licenses
+        // QUAN TRỌNG: Hàm này được gọi sau MỌI thay đổi license (thêm, sửa, xóa)
+        // Đảm bảo dữ liệu luôn được sync lên server (Vercel KV hoặc file JSON)
         function saveLicenses() {
             try {
+                // Bước 1: Lưu vào localStorage trước (để UI hoạt động offline)
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
-                // Sync lên server (optional - không block nếu fail)
-                syncLicensesToServer().catch(() => {
-                    // Silent fail - sync là optional
+                
+                // Bước 2: BẮT BUỘC sync lên server để cập nhật JSON/Vercel KV
+                // Mọi thay đổi license (thêm, sửa, xóa) đều phải sync để API verify có dữ liệu mới
+                syncLicensesToServer().catch((error) => {
+                    console.error('[SAVE] Lỗi khi sync lên server:', error);
+                    // Fallback: Nếu sync fail, vẫn download file JSON để user có thể commit thủ công
+                    setTimeout(() => {
+                        if (licenses.length > 0) {
+                            downloadLicensesJson();
+                            showToast('⚠️ Sync tự động thất bại. Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub!', 'warning', 6000);
+                        }
+                    }, 500);
                 });
             } catch (e) {
                 console.error('Error saving licenses to localStorage:', e);
@@ -1418,7 +1473,8 @@ def verify_license(key):
             updatePreview();
         }
 
-        // Lưu license
+        // Lưu license (THÊM hoặc SỬA)
+        // QUAN TRỌNG: Mọi thay đổi license đều phải gọi saveLicenses() để sync lên server/JSON
         function saveLicense() {
             const key = document.getElementById('licenseKey').value.trim().toUpperCase();
             const expiry = document.getElementById('expiryDate').value;
@@ -1438,7 +1494,7 @@ def verify_license(key):
             const expiryDate = new Date(expiry);
             
             if (currentEditKey) {
-                // Cập nhật
+                // CẬP NHẬT license hiện có
                 const index = licenses.findIndex(l => l.key === currentEditKey);
                 if (index !== -1) {
                     licenses[index].expiry = expiryDate.toISOString();
@@ -1446,7 +1502,7 @@ def verify_license(key):
                     licenses[index].updated = new Date().toISOString();
                 }
             } else {
-                // Thêm mới
+                // THÊM license mới
                 licenses.push({
                     key: key,
                     expiry: expiryDate.toISOString(),
@@ -1456,6 +1512,7 @@ def verify_license(key):
                 });
             }
             
+            // BẮT BUỘC: Lưu và sync lên server/JSON sau mọi thay đổi
             saveLicenses();
             renderLicenses();
             updateStats();
@@ -1469,6 +1526,7 @@ def verify_license(key):
         }
 
         // Xóa license với modal xác nhận và mật khẩu
+        // QUAN TRỌNG: Sau khi xóa phải gọi saveLicenses() để sync lên server/JSON
         function deleteLicense(key) {
             const deletePassword = 'Nguy3nc0ngd@t';
             const modalId = 'deleteConfirmModal_' + Date.now();
@@ -1568,6 +1626,8 @@ def verify_license(key):
                 // Mật khẩu đúng, tiến hành xóa
                 passwordInput.classList.remove('is-invalid');
                 licenses = licenses.filter(l => l.key !== key);
+                
+                // BẮT BUỘC: Lưu và sync lên server/JSON sau khi xóa
                 saveLicenses();
                 renderLicenses();
                 updateStats();
@@ -1843,6 +1903,8 @@ def verify_license(key):
         }
         
         // Bulk delete licenses
+        // Xóa nhiều license cùng lúc
+        // QUAN TRỌNG: Sau khi xóa phải gọi saveLicenses() để sync lên server/JSON
         function bulkDeleteLicenses() {
             const checkboxes = document.querySelectorAll('.license-checkbox:checked');
             const selectedKeys = Array.from(checkboxes).map(cb => cb.getAttribute('data-license-key'));
@@ -1952,6 +2014,8 @@ def verify_license(key):
                 
                 // Xóa các licenses đã chọn
                 licenses = licenses.filter(l => !selectedKeys.includes(l.key));
+                
+                // BẮT BUỘC: Lưu và sync lên server/JSON sau khi xóa
                 saveLicenses();
                 
                 // Reset selection
