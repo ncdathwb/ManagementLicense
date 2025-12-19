@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api/verify",
-      "destination": "/api/verify.js"
+      "destination": "/verify.js"
     },
     {
       "source": "/api/sync",
-      "destination": "/api/sync.js"
+      "destination": "/sync.js"
     }
   ],
   "headers": [
