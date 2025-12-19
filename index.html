@@ -424,6 +424,11 @@
                     <i class="bi bi-code-slash"></i> API & Integration
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="docs-tab" data-bs-toggle="tab" data-bs-target="#docs" type="button">
+                    <i class="bi bi-book"></i> Hướng dẫn API
+                </button>
+            </li>
         </ul>
 
         <!-- Tab Content -->
@@ -661,6 +666,734 @@ def verify_license(key):
                                 <li>Dữ liệu license được lưu trong localStorage của trình duyệt</li>
                                 <li>Để đồng bộ nhiều thiết bị, cần lưu file trên server</li>
                             </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Hướng dẫn API -->
+            <div class="tab-pane fade" id="docs" role="tabpanel">
+                <div class="row">
+                    <div class="col-12 mb-4">
+                        <h3><i class="bi bi-book text-primary"></i> Hướng dẫn sử dụng API đầy đủ</h3>
+                        <p class="text-muted">Tài liệu chi tiết về cách tích hợp License Verification API vào ứng dụng Python và Java</p>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Python Section -->
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-filetype-py"></i> Python Integration</h5>
+                            </div>
+                            <div class="card-body">
+                                <h6 class="text-primary">1. Cài đặt thư viện</h6>
+                                <pre class="bg-light p-3 rounded"><code># Sử dụng requests library
+pip install requests
+
+# Hoặc sử dụng urllib (built-in)
+# Không cần cài đặt thêm</code></pre>
+
+                                <h6 class="text-primary mt-4">2. Ví dụ cơ bản</h6>
+                                <pre class="bg-light p-3 rounded"><code>import requests
+import json
+from datetime import datetime
+
+def verify_license(license_key, api_url):
+    """
+    Verify license key từ API endpoint
+    
+    Args:
+        license_key (str): License key cần verify
+        api_url (str): URL của API endpoint
+    
+    Returns:
+        dict: Kết quả verify với các trường:
+            - valid (bool): License có hợp lệ không
+            - status (str): Trạng thái ('active', 'expired', 'expiring')
+            - expiry (str): Ngày hết hạn (ISO format)
+            - days_remaining (int): Số ngày còn lại
+            - message (str): Thông báo
+    """
+    try:
+        # Tạo URL với format=json để đảm bảo nhận JSON response
+        url = f"{api_url}?verify={license_key}&format=json"
+        
+        # Gửi GET request
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()  # Ném exception nếu status code lỗi
+        
+        # Parse JSON response
+        result = json.loads(response.text)
+        
+        return result
+        
+    except requests.exceptions.RequestException as e:
+        return {
+            'valid': False,
+            'status': 'error',
+            'message': f'Lỗi kết nối: {str(e)}'
+        }
+    except json.JSONDecodeError:
+        return {
+            'valid': False,
+            'status': 'error',
+            'message': 'Lỗi parse JSON response'
+        }
+
+# Sử dụng
+api_endpoint = "https://management-license.vercel.app"
+license_key = "LIC-W8B61JUL-F7OD"
+
+result = verify_license(license_key, api_endpoint)
+
+if result.get('valid'):
+    print(f"✅ License hợp lệ!")
+    print(f"   Hết hạn: {result.get('expiry')}")
+    print(f"   Còn lại: {result.get('days_remaining')} ngày")
+else:
+    print(f"❌ License không hợp lệ: {result.get('message')}")</code></pre>
+
+                                <h6 class="text-primary mt-4">3. Ví dụ với urllib (không cần thư viện ngoài)</h6>
+                                <pre class="bg-light p-3 rounded"><code>import urllib.request
+import json
+
+def verify_license_urllib(license_key, api_url):
+    """Verify license sử dụng urllib (built-in)"""
+    try:
+        url = f"{api_url}?verify={license_key}&format=json"
+        
+        with urllib.request.urlopen(url, timeout=10) as response:
+            data = json.loads(response.read().decode())
+            return data
+            
+    except Exception as e:
+        return {
+            'valid': False,
+            'status': 'error',
+            'message': f'Lỗi: {str(e)}'
+        }
+
+# Sử dụng
+result = verify_license_urllib("LIC-W8B61JUL-F7OD", 
+                                "https://management-license.vercel.app")
+print(result)</code></pre>
+
+                                <h6 class="text-primary mt-4">4. Class wrapper đầy đủ với error handling</h6>
+                                <pre class="bg-light p-3 rounded"><code>import requests
+import json
+from datetime import datetime
+from typing import Dict, Optional
+
+class LicenseVerifier:
+    """Class để verify license với các tính năng đầy đủ"""
+    
+    def __init__(self, api_url: str, timeout: int = 10):
+        """
+        Khởi tạo License Verifier
+        
+        Args:
+            api_url: URL của API endpoint
+            timeout: Timeout cho request (giây)
+        """
+        self.api_url = api_url.rstrip('/')
+        self.timeout = timeout
+    
+    def verify(self, license_key: str) -> Dict:
+        """
+        Verify license key
+        
+        Args:
+            license_key: License key cần verify
+        
+        Returns:
+            dict: Kết quả verify
+        """
+        try:
+            url = f"{self.api_url}?verify={license_key}&format=json"
+            response = requests.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            # Validate response structure
+            if 'valid' not in result:
+                return {
+                    'valid': False,
+                    'status': 'error',
+                    'message': 'Response không hợp lệ'
+                }
+            
+            return result
+            
+        except requests.exceptions.Timeout:
+            return {
+                'valid': False,
+                'status': 'error',
+                'message': 'Request timeout'
+            }
+        except requests.exceptions.ConnectionError:
+            return {
+                'valid': False,
+                'status': 'error',
+                'message': 'Không thể kết nối đến server'
+            }
+        except requests.exceptions.HTTPError as e:
+            return {
+                'valid': False,
+                'status': 'error',
+                'message': f'HTTP Error: {e.response.status_code}'
+            }
+        except Exception as e:
+            return {
+                'valid': False,
+                'status': 'error',
+                'message': f'Lỗi không xác định: {str(e)}'
+            }
+    
+    def is_valid(self, license_key: str) -> bool:
+        """Kiểm tra license có hợp lệ không"""
+        result = self.verify(license_key)
+        return result.get('valid', False)
+    
+    def get_days_remaining(self, license_key: str) -> Optional[int]:
+        """Lấy số ngày còn lại của license"""
+        result = self.verify(license_key)
+        if result.get('valid'):
+            return result.get('days_remaining')
+        return None
+
+# Sử dụng
+verifier = LicenseVerifier("https://management-license.vercel.app")
+
+# Verify license
+result = verifier.verify("LIC-W8B61JUL-F7OD")
+if result['valid']:
+    print(f"License hợp lệ, còn {result['days_remaining']} ngày")
+else:
+    print(f"License không hợp lệ: {result['message']}")
+
+# Hoặc dùng helper methods
+if verifier.is_valid("LIC-W8B61JUL-F7OD"):
+    days = verifier.get_days_remaining("LIC-W8B61JUL-F7OD")
+    print(f"Còn {days} ngày")</code></pre>
+
+                                <h6 class="text-primary mt-4">5. Ví dụ tích hợp vào Flask/Django</h6>
+                                <pre class="bg-light p-3 rounded"><code># Flask Example
+from flask import Flask, request, jsonify
+from functools import wraps
+
+app = Flask(__name__)
+verifier = LicenseVerifier("https://management-license.vercel.app")
+
+def require_valid_license(f):
+    """Decorator để kiểm tra license trước khi cho phép truy cập"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        license_key = request.headers.get('X-License-Key') or \
+                     request.args.get('license_key')
+        
+        if not license_key:
+            return jsonify({'error': 'Thiếu license key'}), 401
+        
+        result = verifier.verify(license_key)
+        if not result.get('valid'):
+            return jsonify({
+                'error': 'License không hợp lệ',
+                'message': result.get('message')
+            }), 403
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/api/protected')
+@require_valid_license
+def protected_endpoint():
+    return jsonify({'message': 'Truy cập thành công!'})
+
+# Django Example
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+
+verifier = LicenseVerifier("https://management-license.vercel.app")
+
+@require_http_methods(["GET"])
+def protected_view(request):
+    license_key = request.GET.get('license_key') or \
+                 request.headers.get('X-License-Key')
+    
+    if not license_key:
+        return JsonResponse({'error': 'Thiếu license key'}, status=401)
+    
+    result = verifier.verify(license_key)
+    if not result.get('valid'):
+        return JsonResponse({
+            'error': 'License không hợp lệ',
+            'message': result.get('message')
+        }, status=403)
+    
+    return JsonResponse({'message': 'Truy cập thành công!'})</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Java Section -->
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-filetype-java"></i> Java Integration</h5>
+                            </div>
+                            <div class="card-body">
+                                <h6 class="text-success">1. Thêm dependency (Maven)</h6>
+                                <pre class="bg-light p-3 rounded"><code>&lt;!-- pom.xml --&gt;
+&lt;dependencies&gt;
+    &lt;!-- Apache HttpClient --&gt;
+    &lt;dependency&gt;
+        &lt;groupId&gt;org.apache.httpcomponents&lt;/groupId&gt;
+        &lt;artifactId&gt;httpclient&lt;/artifactId&gt;
+        &lt;version&gt;4.5.14&lt;/version&gt;
+    &lt;/dependency&gt;
+    
+    &lt;!-- Gson cho JSON parsing --&gt;
+    &lt;dependency&gt;
+        &lt;groupId&gt;com.google.code.gson&lt;/groupId&gt;
+        &lt;artifactId&gt;gson&lt;/artifactId&gt;
+        &lt;version&gt;2.10.1&lt;/version&gt;
+    &lt;/dependency&gt;
+&lt;/dependencies&gt;</code></pre>
+
+                                <h6 class="text-success mt-4">2. Ví dụ cơ bản với HttpClient</h6>
+                                <pre class="bg-light p-3 rounded"><code>import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import java.io.IOException;
+
+public class LicenseVerifier {
+    private static final String API_URL = 
+        "https://management-license.vercel.app";
+    private final Gson gson = new Gson();
+    
+    public LicenseResult verify(String licenseKey) {
+        try {
+            String url = API_URL + "?verify=" + licenseKey + "&format=json";
+            
+            CloseableHttpClient httpClient = HttpClients.createDefault();
+            HttpGet request = new HttpGet(url);
+            
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                String jsonResponse = EntityUtils.toString(
+                    response.getEntity()
+                );
+                
+                JsonObject json = gson.fromJson(jsonResponse, JsonObject.class);
+                
+                return new LicenseResult(
+                    json.get("valid").getAsBoolean(),
+                    json.get("status").getAsString(),
+                    json.get("expiry").getAsString(),
+                    json.get("days_remaining").getAsInt(),
+                    json.get("message").getAsString()
+                );
+            }
+        } catch (IOException e) {
+            return new LicenseResult(
+                false, 
+                "error", 
+                null, 
+                0, 
+                "Lỗi kết nối: " + e.getMessage()
+            );
+        }
+    }
+    
+    // Inner class để chứa kết quả
+    public static class LicenseResult {
+        private final boolean valid;
+        private final String status;
+        private final String expiry;
+        private final int daysRemaining;
+        private final String message;
+        
+        public LicenseResult(boolean valid, String status, String expiry,
+                           int daysRemaining, String message) {
+            this.valid = valid;
+            this.status = status;
+            this.expiry = expiry;
+            this.daysRemaining = daysRemaining;
+            this.message = message;
+        }
+        
+        // Getters
+        public boolean isValid() { return valid; }
+        public String getStatus() { return status; }
+        public String getExpiry() { return expiry; }
+        public int getDaysRemaining() { return daysRemaining; }
+        public String getMessage() { return message; }
+    }
+}
+
+// Sử dụng
+LicenseVerifier verifier = new LicenseVerifier();
+LicenseVerifier.LicenseResult result = 
+    verifier.verify("LIC-W8B61JUL-F7OD");
+
+if (result.isValid()) {
+    System.out.println("✅ License hợp lệ!");
+    System.out.println("   Hết hạn: " + result.getExpiry());
+    System.out.println("   Còn lại: " + result.getDaysRemaining() + " ngày");
+} else {
+    System.out.println("❌ License không hợp lệ: " + result.getMessage());
+}</code></pre>
+
+                                <h6 class="text-success mt-4">3. Sử dụng Java 11+ HttpClient (không cần dependency)</h6>
+                                <pre class="bg-light p-3 rounded"><code>import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import java.time.Duration;
+
+public class LicenseVerifierJava11 {
+    private static final String API_URL = 
+        "https://management-license.vercel.app";
+    private final HttpClient httpClient;
+    private final Gson gson = new Gson();
+    
+    public LicenseVerifierJava11() {
+        this.httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+    }
+    
+    public LicenseResult verify(String licenseKey) {
+        try {
+            String url = API_URL + "?verify=" + licenseKey + "&format=json";
+            
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(10))
+                .GET()
+                .build();
+            
+            HttpResponse&lt;String&gt; response = httpClient.send(
+                request, 
+                HttpResponse.BodyHandlers.ofString()
+            );
+            
+            if (response.statusCode() == 200) {
+                JsonObject json = gson.fromJson(
+                    response.body(), 
+                    JsonObject.class
+                );
+                
+                return new LicenseResult(
+                    json.get("valid").getAsBoolean(),
+                    json.get("status").getAsString(),
+                    json.get("expiry").getAsString(),
+                    json.get("days_remaining").getAsInt(),
+                    json.get("message").getAsString()
+                );
+            } else {
+                return new LicenseResult(
+                    false, 
+                    "error", 
+                    null, 
+                    0, 
+                    "HTTP Error: " + response.statusCode()
+                );
+            }
+        } catch (Exception e) {
+            return new LicenseResult(
+                false, 
+                "error", 
+                null, 
+                0, 
+                "Lỗi: " + e.getMessage()
+            );
+        }
+    }
+    
+    // LicenseResult class giống như trên
+}</code></pre>
+
+                                <h6 class="text-success mt-4">4. Class wrapper đầy đủ với error handling</h6>
+                                <pre class="bg-light p-3 rounded"><code>import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import java.io.IOException;
+import java.util.Optional;
+
+public class LicenseVerifierAdvanced {
+    private final String apiUrl;
+    private final int timeoutSeconds;
+    private final Gson gson = new Gson();
+    
+    public LicenseVerifierAdvanced(String apiUrl, int timeoutSeconds) {
+        this.apiUrl = apiUrl;
+        this.timeoutSeconds = timeoutSeconds;
+    }
+    
+    public LicenseResult verify(String licenseKey) {
+        try {
+            String url = String.format(
+                "%s?verify=%s&format=json", 
+                apiUrl, 
+                licenseKey
+            );
+            
+            CloseableHttpClient httpClient = HttpClients.createDefault();
+            HttpGet request = new HttpGet(url);
+            
+            // Set timeout
+            RequestConfig config = RequestConfig.custom()
+                .setConnectTimeout(timeoutSeconds * 1000)
+                .setSocketTimeout(timeoutSeconds * 1000)
+                .build();
+            request.setConfig(config);
+            
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                
+                if (statusCode != 200) {
+                    return new LicenseResult(
+                        false, 
+                        "error", 
+                        null, 
+                        0, 
+                        "HTTP Error: " + statusCode
+                    );
+                }
+                
+                String jsonResponse = EntityUtils.toString(
+                    response.getEntity()
+                );
+                
+                JsonObject json = gson.fromJson(jsonResponse, JsonObject.class);
+                
+                // Validate response
+                if (!json.has("valid")) {
+                    return new LicenseResult(
+                        false, 
+                        "error", 
+                        null, 
+                        0, 
+                        "Response không hợp lệ"
+                    );
+                }
+                
+                return new LicenseResult(
+                    json.get("valid").getAsBoolean(),
+                    json.has("status") ? json.get("status").getAsString() : "unknown",
+                    json.has("expiry") ? json.get("expiry").getAsString() : null,
+                    json.has("days_remaining") ? json.get("days_remaining").getAsInt() : 0,
+                    json.has("message") ? json.get("message").getAsString() : ""
+                );
+            }
+        } catch (java.net.SocketTimeoutException e) {
+            return new LicenseResult(
+                false, 
+                "error", 
+                null, 
+                0, 
+                "Request timeout"
+            );
+        } catch (java.net.UnknownHostException e) {
+            return new LicenseResult(
+                false, 
+                "error", 
+                null, 
+                0, 
+                "Không thể kết nối đến server"
+            );
+        } catch (IOException e) {
+            return new LicenseResult(
+                false, 
+                "error", 
+                null, 
+                0, 
+                "Lỗi IO: " + e.getMessage()
+            );
+        } catch (Exception e) {
+            return new LicenseResult(
+                false, 
+                "error", 
+                null, 
+                0, 
+                "Lỗi không xác định: " + e.getMessage()
+            );
+        }
+    }
+    
+    public boolean isValid(String licenseKey) {
+        LicenseResult result = verify(licenseKey);
+        return result.isValid();
+    }
+    
+    public Optional&lt;Integer&gt; getDaysRemaining(String licenseKey) {
+        LicenseResult result = verify(licenseKey);
+        if (result.isValid()) {
+            return Optional.of(result.getDaysRemaining());
+        }
+        return Optional.empty();
+    }
+}</code></pre>
+
+                                <h6 class="text-success mt-4">5. Ví dụ tích hợp vào Spring Boot</h6>
+                                <pre class="bg-light p-3 rounded"><code>// Spring Boot Controller
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api")
+public class LicenseController {
+    
+    @Autowired
+    private LicenseVerifierAdvanced licenseVerifier;
+    
+    @GetMapping("/verify")
+    public ResponseEntity&lt;LicenseResult&gt; verifyLicense(
+            @RequestParam String licenseKey) {
+        LicenseResult result = licenseVerifier.verify(licenseKey);
+        
+        if (result.isValid()) {
+            return ResponseEntity.ok(result);
+        } else {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(result);
+        }
+    }
+}
+
+// Spring Boot Service
+import org.springframework.stereotype.Service;
+
+@Service
+public class LicenseService {
+    
+    private final LicenseVerifierAdvanced verifier;
+    
+    public LicenseService() {
+        this.verifier = new LicenseVerifierAdvanced(
+            "https://management-license.vercel.app", 
+            10
+        );
+    }
+    
+    public boolean checkLicense(String licenseKey) {
+        return verifier.isValid(licenseKey);
+    }
+    
+    public void validateLicense(String licenseKey) {
+        LicenseResult result = verifier.verify(licenseKey);
+        if (!result.isValid()) {
+            throw new LicenseException(
+                "License không hợp lệ: " + result.getMessage()
+            );
+        }
+    }
+}
+
+// Custom Exception
+public class LicenseException extends RuntimeException {
+    public LicenseException(String message) {
+        super(message);
+    }
+}
+
+// Interceptor để kiểm tra license tự động
+import org.springframework.web.servlet.HandlerInterceptor;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@Component
+public class LicenseInterceptor implements HandlerInterceptor {
+    
+    @Autowired
+    private LicenseService licenseService;
+    
+    @Override
+    public boolean preHandle(HttpServletRequest request, 
+                           HttpServletResponse response, 
+                           Object handler) throws Exception {
+        String licenseKey = request.getHeader("X-License-Key") != null ?
+            request.getHeader("X-License-Key") :
+            request.getParameter("license_key");
+        
+        if (licenseKey == null || !licenseService.checkLicense(licenseKey)) {
+            response.setStatus(HttpStatus.FORBIDDEN.value());
+            response.getWriter().write("License không hợp lệ");
+            return false;
+        }
+        
+        return true;
+    }
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Best Practices Section -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-lightbulb"></i> Best Practices & Lưu ý</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-info">✅ Nên làm:</h6>
+                                        <ul>
+                                            <li>Luôn sử dụng <code>format=json</code> trong URL để đảm bảo nhận JSON response</li>
+                                            <li>Xử lý timeout và error handling đầy đủ</li>
+                                            <li>Cache kết quả verify trong thời gian ngắn (5-10 phút) để giảm số lượng request</li>
+                                            <li>Sử dụng HTTPS để bảo mật</li>
+                                            <li>Validate response structure trước khi sử dụng</li>
+                                            <li>Log các lỗi để debug dễ dàng</li>
+                                            <li>Kiểm tra <code>days_remaining</code> để cảnh báo sớm khi license sắp hết hạn</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-danger">❌ Không nên:</h6>
+                                        <ul>
+                                            <li>Không verify license mỗi request (quá tốn tài nguyên)</li>
+                                            <li>Không hardcode API URL trong code (dùng config file)</li>
+                                            <li>Không bỏ qua error handling</li>
+                                            <li>Không gửi license key trong URL query nếu có thể (dùng header)</li>
+                                            <li>Không cache quá lâu (license có thể bị thay đổi)</li>
+                                            <li>Không trust response mà không validate</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4">
+                                    <h6 class="text-warning">⚠️ Response Format:</h6>
+                                    <pre class="bg-light p-3 rounded"><code>{
+    "valid": true/false,           // License có hợp lệ không
+    "key": "LIC-W8B61JUL-F7OD",   // License key
+    "expiry": "2024-12-31T23:59:59.000Z",  // Ngày hết hạn (ISO 8601)
+    "status": "active|expired|expiring",    // Trạng thái
+    "message": "License hợp lệ",           // Thông báo
+    "days_remaining": 45,                  // Số ngày còn lại (có thể âm nếu hết hạn)
+    "note": "Ghi chú",                     // Ghi chú (nếu có)
+    "timestamp": "2024-01-15T10:30:00.000Z" // Thời gian verify
+}</code></pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
