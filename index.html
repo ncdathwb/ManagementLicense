@@ -4,6 +4,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>License Manager với Verify Online</title>
+    <!-- JSON API Response cho ?verify= -->
+    <script>
+        // Output JSON ngay đầu file nếu có ?verify= (cho Python requests)
+        (function() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const verifyKey = urlParams.get('verify');
+                const format = urlParams.get('format');
+                const hasHash = window.location.hash && window.location.hash.length > 1;
+                const hasOtherParams = Array.from(urlParams.keys()).some(k => k !== 'verify' && k !== 'format');
+                
+                if (verifyKey && (format === 'json' || (!hasHash && !hasOtherParams))) {
+                    // Load licenses từ localStorage
+                    let licenses = [];
+                    try {
+                        const data = localStorage.getItem('licenses');
+                        if (data) licenses = JSON.parse(data);
+                    } catch(e) {}
+                    
+                    const license = licenses.find(l => l.key === verifyKey.toUpperCase());
+                    const now = new Date();
+                    
+                    let result;
+                    if (!license) {
+                        result = {valid: false, key: verifyKey, status: 'expired', message: 'License không tồn tại', days_remaining: 0, timestamp: now.toISOString()};
+                    } else {
+                        const expiry = new Date(license.expiry);
+                        const diffTime = expiry - now;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        let status, valid;
+                        if (diffTime <= 0) { status = 'expired'; valid = false; }
+                        else if (diffDays <= 7) { status = 'expiring'; valid = true; }
+                        else { status = 'valid'; valid = true; }
+                        result = {
+                            valid: valid,
+                            key: license.key,
+                            expiry: license.expiry,
+                            status: valid && status !== 'expired' ? 'active' : status,
+                            message: valid ? (status === 'expiring' ? 'License sắp hết hạn' : 'License hợp lệ') : 'License đã hết hạn',
+                            days_remaining: diffDays,
+                            note: license.note || '',
+                            timestamp: now.toISOString()
+                        };
+                    }
+                    // Output JSON vào document ngay lập tức
+                    document.open('text/plain');
+                    document.write(JSON.stringify(result));
+                    document.close();
+                    if (window.stop) window.stop();
+                }
+            } catch(e) {}
+        })();
+    </script>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
@@ -840,7 +893,9 @@ def verify_license(key):
                     result = {
                         valid: false,
                         key: verifyKey,
+                        status: 'expired',
                         message: 'License không tồn tại',
+                        days_remaining: 0,
                         timestamp: now.toISOString()
                     };
                 } else {
@@ -874,18 +929,35 @@ def verify_license(key):
                     };
                 }
 
-                // Kiểm tra nếu request có format=json thì trả về JSON
-                // Nếu không có format=json, sẽ hiển thị UI (xử lý trong handleUrlVerification)
+                // Kiểm tra nếu request có format=json hoặc chỉ có ?verify= (API call từ app.py)
                 const format = urlParams.get('format');
-                const isJsonRequest = format === 'json' || window.location.search.includes('format=json');
+                const hasHash = window.location.hash && window.location.hash.length > 1;
+                const hasOtherParams = Array.from(urlParams.keys()).some(k => k !== 'verify' && k !== 'format');
+                
+                // Luôn trả JSON nếu:
+                // 1. Có format=json
+                // 2. Chỉ có ?verify= và không có hash, không có params khác (API request)
+                const isJsonRequest = format === 'json' || 
+                                     window.location.search.includes('format=json') ||
+                                     (verifyKey && !hasHash && !hasOtherParams); // Chỉ có ?verify= -> API request
 
                 // Nếu là JSON request, trả về JSON ngay và dừng
                 if (isJsonRequest) {
-                    // Set content type và trả về JSON
-                    // Note: document.contentType không hoạt động, nhưng server có thể set header
-                    document.body.innerHTML = '';
-                    document.write(JSON.stringify(result, null, 2));
-                    document.close();
+                    // Đảm bảo status format đúng với app.py mong đợi
+                    // app.py kiểm tra: status in ("active", "đang hoạt động", "") thì hợp lệ
+                    // Status "expired" hoặc khác sẽ bị reject
+                    if (result.valid && result.status !== 'expired') {
+                        // License hợp lệ (kể cả sắp hết hạn) -> status = "active" để app.py chấp nhận
+                        result.status = 'active';
+                    }
+                    // Nếu expired thì giữ nguyên status = 'expired'
+                    
+                    // Trả về JSON thuần - xóa toàn bộ document và chỉ trả JSON
+                    // Đảm bảo không có HTML tags nào trong response
+                    document.documentElement.innerHTML = '';
+                    document.documentElement.textContent = JSON.stringify(result, null, 2);
+                    // Dừng mọi script khác
+                    if (window.stop) window.stop();
                     return; // Dừng execution
                 }
                 // Nếu không phải JSON request, tiếp tục load UI bình thường
@@ -994,9 +1066,33 @@ def verify_license(key):
         }
 
         // Lưu dữ liệu
+        // Sync licenses lên server (optional - để API endpoint có thể đọc)
+        async function syncLicensesToServer() {
+            try {
+                const response = await fetch(`${window.location.origin}/api/sync`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ licenses: licenses })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    console.log('[SYNC] Licenses synced to server:', result);
+                }
+            } catch (e) {
+                // Không báo lỗi nếu sync fail (có thể chưa có API endpoint)
+                console.log('[SYNC] Sync to server skipped (optional):', e.message);
+            }
+        }
+
         function saveLicenses() {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
+                // Sync lên server (optional - không block nếu fail)
+                syncLicensesToServer().catch(() => {
+                    // Silent fail - sync là optional
+                });
             } catch (e) {
                 console.error('Error saving licenses to localStorage:', e);
                 showModalAlert('Không thể lưu dữ liệu. Vui lòng kiểm tra cài đặt trình duyệt.', 'Lỗi', 'error');
@@ -2398,6 +2494,7 @@ def verify_license(key):
                 return {
                     valid: false,
                     key: key,
+                    status: 'expired',
                     message: 'License không tồn tại',
                     timestamp: now.toISOString()
                 };
@@ -2406,11 +2503,21 @@ def verify_license(key):
             const status = getLicenseStatus(license.expiry);
             const expiry = new Date(license.expiry);
             
+            // Đảm bảo status format đúng với app.py mong đợi
+            // app.py kiểm tra: status in ("active", "đang hoạt động", "") thì hợp lệ
+            let apiStatus = status.status;
+            if (status.valid && status.status !== 'expired') {
+                // License hợp lệ (kể cả sắp hết hạn) -> status = "active" để app.py chấp nhận
+                apiStatus = 'active';
+            } else if (status.status === 'expired') {
+                apiStatus = 'expired';
+            }
+            
             return {
                 valid: status.valid,
                 key: license.key,
                 expiry: license.expiry,
-                status: status.status,
+                status: apiStatus,
                 message: status.valid ? 
                     (status.status === 'expiring' ? 'License sắp hết hạn' : 'License hợp lệ') : 
                     'License đã hết hạn',
