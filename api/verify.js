@@ -16,43 +16,51 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Đọc licenses: ƯU TIÊN Vercel KV (dữ liệu mới nhất từ sync), sau đó mới fallback về file JSON
-    let licenses = [];
-    
-    // ƯU TIÊN: Đọc từ Vercel KV trước (dữ liệu được sync mới nhất)
+    // Đọc licenses: kết hợp KV và file để tránh mất key khi KV chưa sync
+    let licensesFromKv = [];
+    let licensesFromFile = [];
+
+    // 1) Đọc từ Vercel KV (nếu có)
     try {
       const { kv } = require('@vercel/kv');
       if (kv) {
         const kvData = await kv.get('licenses');
         if (kvData && Array.isArray(kvData) && kvData.length > 0) {
-          licenses = kvData;
+          licensesFromKv = kvData;
           console.log('[VERIFY] Loaded licenses from Vercel KV:', kvData.length);
         }
       }
     } catch (e) {
-      // Vercel KV không khả dụng, sẽ fallback về file
-      console.log('[VERIFY] Vercel KV not available, falling back to file:', e.message);
+      console.log('[VERIFY] Vercel KV not available, will still read file:', e.message);
     }
-    
-    // FALLBACK: Nếu Vercel KV trống hoặc không có, đọc từ file JSON (trong repo)
-    if (licenses.length === 0) {
-      try {
-        const fs = require('fs');
-        const path = require('path');
-        const licensesPath = path.join(process.cwd(), 'licenses.json');
-        
-        if (fs.existsSync(licensesPath)) {
-          const data = fs.readFileSync(licensesPath, 'utf8');
-          const parsed = JSON.parse(data);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            licenses = parsed;
-            console.log('[VERIFY] Loaded licenses from file:', parsed.length);
-          }
+
+    // 2) Đọc từ file JSON trong repo (để đảm bảo luôn có key gốc)
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const licensesPath = path.join(process.cwd(), 'licenses.json');
+
+      if (fs.existsSync(licensesPath)) {
+        const data = fs.readFileSync(licensesPath, 'utf8');
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          licensesFromFile = parsed;
+          console.log('[VERIFY] Loaded licenses from file:', parsed.length);
         }
-      } catch (fileError) {
-        console.error('[VERIFY] Error reading licenses.json:', fileError);
       }
+    } catch (fileError) {
+      console.error('[VERIFY] Error reading licenses.json:', fileError);
     }
+
+    // 3) Gộp: ưu tiên KV (nếu có), nhưng nếu KV thiếu key thì lấy từ file
+    const licenseMap = new Map();
+    for (const lic of licensesFromFile) {
+      if (lic && lic.key) licenseMap.set(String(lic.key).toUpperCase(), lic);
+    }
+    for (const lic of licensesFromKv) {
+      if (lic && lic.key) licenseMap.set(String(lic.key).toUpperCase(), lic);
+    }
+    const licenses = Array.from(licenseMap.values());
 
     // Tìm license
     const license = licenses.find(
