@@ -842,6 +842,8 @@ def verify_license(key):
     <script>
         // Biến toàn cục
         let licenses = [];
+        // Snapshot để phát hiện thay đổi localStorage mà không cần reload trang
+        let lastLicensesSnapshot = null;
         let currentEditKey = null;
         const STORAGE_KEY = 'licenseManagerData';
         
@@ -980,6 +982,11 @@ def verify_license(key):
                 renderLicenses();
                 updateStats();
                 updateLiveEndpoint();
+                
+                // Lắng nghe thay đổi localStorage từ tab khác
+                window.addEventListener('storage', refreshLicensesIfChanged);
+                // Interval nhỏ để phát hiện thay đổi localStorage trong cùng tab (nếu có sync nền)
+                setInterval(refreshLicensesIfChanged, 5000);
                 
                 // Xử lý verify từ URL (chỉ hiển thị UI, không trả JSON)
                 handleUrlVerification();
@@ -1145,6 +1152,8 @@ def verify_license(key):
                 const data = localStorage.getItem(STORAGE_KEY);
                 if (data) {
                     licenses = JSON.parse(data);
+                    // Lưu snapshot để phát hiện thay đổi sau này
+                    lastLicensesSnapshot = data;
                     // Validate data structure
                     if (!Array.isArray(licenses)) {
                         licenses = [];
@@ -1153,6 +1162,27 @@ def verify_license(key):
             } catch (e) {
                 console.error('Error loading licenses from localStorage:', e);
                 licenses = [];
+            }
+        }
+
+        // Tự động refresh UI khi localStorage thay đổi (cùng tab hoặc tab khác)
+        function refreshLicensesIfChanged() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                // Nếu dữ liệu không thay đổi, bỏ qua
+                if (data === lastLicensesSnapshot) return;
+
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    if (Array.isArray(parsed)) {
+                        licenses = parsed;
+                        lastLicensesSnapshot = data;
+                        renderLicenses();
+                        updateStats();
+                    }
+                }
+            } catch (e) {
+                console.error('Error refreshing licenses from localStorage:', e);
             }
         }
 
