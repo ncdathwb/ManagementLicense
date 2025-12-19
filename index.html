@@ -3098,6 +3098,9 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
+        let verifyUrlModalInstance = null;
+        let verifyUrlModalEl = null;
+
         // Lấy verify URL
         function getVerifyUrl(key) {
             return `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(key)}`;
@@ -3128,7 +3131,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                                <button type="button" class="btn btn-primary" onclick="copyToClipboard('${safeUrl.replace(/'/g, "\\'")}'); document.getElementById('verifyUrlModal').remove();">
+                                <button type="button" class="btn btn-primary" onclick="copyToClipboard('${safeUrl.replace(/'/g, "\\'")}'); if (verifyUrlModalInstance) verifyUrlModalInstance.hide();">
                                     <i class="bi bi-copy"></i> Copy URL
                                 </button>
                             </div>
@@ -3142,10 +3145,12 @@ public class LicenseInterceptor implements HandlerInterceptor {
             if (oldModal) oldModal.remove();
             
             document.body.insertAdjacentHTML('beforeend', modalHtml);
-            const modal = new bootstrap.Modal(document.getElementById('verifyUrlModal'));
-            modal.show();
+            verifyUrlModalEl = document.getElementById('verifyUrlModal');
+            verifyUrlModalInstance = new bootstrap.Modal(verifyUrlModalEl);
+            verifyUrlModalInstance.show();
             
-            document.getElementById('verifyUrlModal').addEventListener('hidden.bs.modal', function() {
+            verifyUrlModalEl.addEventListener('hidden.bs.modal', function() {
+                verifyUrlModalInstance = null;
                 this.remove();
             });
         }

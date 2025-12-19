@@ -6,8 +6,9 @@ export default async function handler(req, res) {
   }
 
   const { verify } = req.query;
-  
-  if (!verify) {
+  const normalizedKey = (verify || '').toString().trim().toUpperCase();
+
+  if (!normalizedKey) {
     return res.status(400).json({ 
       valid: false, 
       message: 'Missing license key parameter' 
@@ -54,13 +55,15 @@ export default async function handler(req, res) {
     }
 
     // Tìm license
-    const license = licenses.find(l => l.key === verify.toUpperCase());
+    const license = licenses.find(
+      (l) => (l.key || '').toString().trim().toUpperCase() === normalizedKey
+    );
     const now = new Date();
 
     if (!license) {
       return res.status(200).json({
         valid: false,
-        key: verify,
+        key: normalizedKey,
         status: 'expired',
         message: 'License không tồn tại',
         days_remaining: 0,
