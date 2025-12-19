@@ -74,7 +74,8 @@ export default async function handler(req, res) {
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     let status, valid;
-    if (diffTime <= 0) {
+    // Nếu days_remaining <= 0 (số âm hoặc 0) thì key hết hạn
+    if (diffDays <= 0 || diffTime <= 0) {
       status = 'expired';
       valid = false;
     } else if (diffDays <= 7) {
