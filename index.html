@@ -632,8 +632,8 @@ def verify_license(key):
                                 <button class="btn btn-sm btn-outline-primary" onclick="copyEndpoint()">
                                     <i class="bi bi-copy"></i> Copy Endpoint
                                 </button>
-                                <button class="btn btn-sm btn-success" onclick="downloadLicensesJson(); showToast('Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub.')">
-                                    <i class="bi bi-download"></i> Export licenses.json
+                                <button class="btn btn-sm btn-success" onclick="if(downloadLicensesJson()) { showToast('✅ Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub để API verify hoạt động!', 'success', 5000); }">
+                                    <i class="bi bi-download"></i> Download licenses.json
                                 </button>
                                 <button class="btn btn-sm btn-outline-success" onclick="refreshEndpoint()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
@@ -1087,17 +1087,32 @@ def verify_license(key):
                     if (result.message && result.message.includes('Vercel KV')) {
                         showToast('✅ Đã cập nhật license lên server (Vercel KV). API verify sẽ dùng dữ liệu mới ngay lập tức!', 'success', 4000);
                     } 
-                    // Nếu phải dùng file JSON -> cần download và commit
-                    else if (result.message && (result.message.includes('licenses.json') || result.message.includes('commit'))) {
+                    // Nếu phải dùng file JSON -> LUÔN download để commit thủ công
+                    else {
+                        // Luôn download file JSON để đảm bảo có file mới nhất để commit
                         if (licenses.length > 0) {
                             setTimeout(() => {
                                 if (downloadLicensesJson()) {
-                                    showToast('⚠️ Đã sync và tải xuống licenses.json. Vui lòng commit file này lên GitHub để API verify hoạt động với dữ liệu mới!', 'warning', 6000);
+                                    if (result.message && result.message.includes('commit')) {
+                                        showToast('⚠️ Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub để API verify hoạt động với dữ liệu mới!', 'warning', 6000);
+                                    } else {
+                                        showToast('✅ Đã cập nhật và tải xuống licenses.json. Vui lòng commit file này lên GitHub!', 'success', 5000);
+                                    }
+                                } else {
+                                    showToast('⚠️ Sync thành công nhưng không thể tải file. Vui lòng kiểm tra console để xem JSON content.', 'warning', 6000);
                                 }
                             }, 500);
                         }
-                    } else {
-                        showToast('✅ Đã cập nhật license thành công!', 'success', 3000);
+                    }
+                } else {
+                    // Nếu sync fail, vẫn download file JSON
+                    console.error('[SYNC] Sync failed:', result);
+                    if (licenses.length > 0) {
+                        setTimeout(() => {
+                            if (downloadLicensesJson()) {
+                                showToast('⚠️ Sync thất bại nhưng đã tải xuống licenses.json. Vui lòng commit file này lên GitHub!', 'warning', 6000);
+                            }
+                        }, 500);
                     }
                 }
             } catch (e) {
@@ -1107,6 +1122,7 @@ def verify_license(key):
         }
 
         // Tự động download file licenses.json để commit lên GitHub
+        // QUAN TRỌNG: File này cần được commit lên GitHub để API verify có thể đọc dữ liệu mới
         function downloadLicensesJson() {
             try {
                 const jsonContent = JSON.stringify(licenses, null, 2);
@@ -1115,15 +1131,24 @@ def verify_license(key):
                 const link = document.createElement('a');
                 link.href = url;
                 link.download = 'licenses.json';
+                link.style.display = 'none'; // Ẩn link
                 document.body.appendChild(link);
                 link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
+                
+                // Cleanup sau 100ms
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }, 100);
+                
                 console.log('[DOWNLOAD] licenses.json đã được tải xuống. Vui lòng commit file này lên GitHub.');
+                console.log('[DOWNLOAD] Số lượng licenses:', licenses.length);
                 return true;
             } catch (e) {
                 console.error('[DOWNLOAD] Lỗi khi tải file licenses.json:', e);
-                showToast('Lỗi khi tải file licenses.json', 'error');
+                showToast('Lỗi khi tải file licenses.json. Vui lòng thử lại hoặc copy JSON từ console.', 'error');
+                // Fallback: In JSON ra console để user có thể copy
+                console.log('[DOWNLOAD] JSON Content:', JSON.stringify(licenses, null, 2));
                 return false;
             }
         }
@@ -1135,6 +1160,7 @@ def verify_license(key):
             try {
                 // Bước 1: Lưu vào localStorage trước (để UI hoạt động offline)
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
+                console.log('[SAVE] Đã lưu vào localStorage. Số lượng licenses:', licenses.length);
                 
                 // Bước 2: BẮT BUỘC sync lên server để cập nhật JSON/Vercel KV
                 // Mọi thay đổi license (thêm, sửa, xóa) đều phải sync để API verify có dữ liệu mới
@@ -1143,8 +1169,11 @@ def verify_license(key):
                     // Fallback: Nếu sync fail, vẫn download file JSON để user có thể commit thủ công
                     setTimeout(() => {
                         if (licenses.length > 0) {
-                            downloadLicensesJson();
-                            showToast('⚠️ Sync tự động thất bại. Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub!', 'warning', 6000);
+                            if (downloadLicensesJson()) {
+                                showToast('⚠️ Sync tự động thất bại. Đã tải xuống licenses.json. Vui lòng commit file này lên GitHub để API verify hoạt động!', 'warning', 7000);
+                            } else {
+                                showToast('⚠️ Sync thất bại và không thể tải file. Vui lòng dùng nút "Download licenses.json" để tải thủ công.', 'error', 7000);
+                            }
                         }
                     }, 500);
                 });
