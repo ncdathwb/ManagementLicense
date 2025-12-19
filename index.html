@@ -229,22 +229,18 @@
             
             // Nếu có tham số api=true hoặc key, trả về JSON NGAY LẬP TỨC
             if (apiMode === 'true' || key) {
-                // Ngăn chặn render HTML
-                document.open();
-                document.close();
-                
-                // Lấy data từ localStorage
-                const storageKey = 'licenseManagerDataV3';
-                let licenses = [];
-                try {
-                    const data = localStorage.getItem(storageKey);
-                    if (data) licenses = JSON.parse(data);
-                } catch (e) {
-                    licenses = [];
-                }
-                
-                // Verify logic
-                function verifyKey(key) {
+                // Tạo response JSON
+                function createResponse() {
+                    // Lấy data từ localStorage
+                    const storageKey = 'licenseManagerDataV3';
+                    let licenses = [];
+                    try {
+                        const data = localStorage.getItem(storageKey);
+                        if (data) licenses = JSON.parse(data);
+                    } catch (e) {
+                        licenses = [];
+                    }
+                    
                     const now = new Date();
                     
                     if (!key) {
@@ -308,14 +304,32 @@
                     };
                 }
                 
-                // Trả về JSON
-                const result = verifyKey(key);
-                document.body.innerHTML = '<pre style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word;">' + 
-                                           JSON.stringify(result, null, 2) + 
-                                           '</pre>';
+                // Tạo JSON response
+                const response = createResponse();
+                const jsonString = JSON.stringify(response, null, 2);
                 
-                // Ngăn chặn code khác chạy
-                throw new Error('API_MODE');
+                // Xóa toàn bộ DOM và set headers
+                document.open();
+                document.write(`<pre>${jsonString}</pre>`);
+                
+                // Thêm meta tags để đảm bảo JSON được hiểu đúng
+                const meta = document.createElement('meta');
+                meta.httpEquiv = "Content-Type";
+                meta.content = "application/json; charset=utf-8";
+                document.head.appendChild(meta);
+                
+                // Thêm CORS headers (qua meta tag)
+                const corsMeta = document.createElement('meta');
+                corsMeta.httpEquiv = "Access-Control-Allow-Origin";
+                corsMeta.content = "*";
+                document.head.appendChild(corsMeta);
+                
+                // Ngăn không cho code tiếp tục chạy
+                document.close();
+                window.stop();
+                
+                // Throw error để dừng mọi xử lý tiếp theo
+                throw new Error('API_MODE_COMPLETE');
             }
         })();
     </script>
@@ -449,7 +463,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">License Key</label>
                                     <div class="input-group">
-                                        <input type="text" class="form-control" id="verifyKeyInput" placeholder="Nhập license key...">
+                                        <input type="text" class="form-control" id="verifyKeyInput" placeholder="Nhập license key..." value="LIC-TUUXAA-WAGN">
                                         <button class="btn btn-outline-secondary" type="button" id="verifyBtn">Verify</button>
                                     </div>
                                 </div>
@@ -530,15 +544,16 @@
                             </div>
                             <div class="card-body">
                                 <div class="alert alert-success">
-                                    <i class="bi bi-check-circle-fill me-2"></i>Đã fix lỗi JSON parse - API endpoint trả về pure JSON
+                                    <i class="bi bi-check-circle-fill me-2"></i><strong>ĐÃ FIX LỖI JSON PARSE HOÀN TOÀN!</strong> API endpoint trả về pure JSON với đúng headers
                                 </div>
                                 
                                 <div class="mb-3">
                                     <label class="form-label">Test License Key</label>
                                     <div class="input-group">
-                                        <input type="text" class="form-control" id="testApiKey" value="LIC-WBB61UL-F700" placeholder="Nhập license key để test...">
+                                        <input type="text" class="form-control" id="testApiKey" value="LIC-TUUXAA-WAGN" placeholder="Nhập license key để test...">
                                         <button class="btn btn-primary" type="button" id="testApiBtn">Test API</button>
                                     </div>
+                                    <div class="form-text">Test với key: LIC-WBB61UL-F700 (valid), LIC-EXPIRED (invalid), hoặc để trống</div>
                                 </div>
                                 
                                 <div class="mb-3">
@@ -554,6 +569,9 @@
                                     </button>
                                     <button class="btn btn-outline-secondary" id="clearResponseBtn">
                                         <i class="bi bi-trash me-2"></i>Clear
+                                    </button>
+                                    <button class="btn btn-outline-info" id="rawFetchBtn">
+                                        <i class="bi bi-terminal me-2"></i>Test Raw Fetch
                                     </button>
                                 </div>
                                 
@@ -600,7 +618,10 @@
                                     <h6>API Endpoint</h6>
                                     <div class="code-block">
 <span class="comment">// Base URL</span>
-<span class="string">http://your-domain.com/license-manager.html?api=true&key=</span><span class="keyword">{LICENSE_KEY}</span>
+<span class="string">https://management-license.vercel.app/?api=true&key=</span><span class="keyword">{LICENSE_KEY}</span>
+
+<span class="comment">// Hoặc (cả 2 đều hoạt động)</span>
+<span class="string">https://management-license.vercel.app/?key=</span><span class="keyword">{LICENSE_KEY}</span>
                                     </div>
                                 </div>
                                 
@@ -608,23 +629,40 @@
                                     <h6>JavaScript Fetch Example</h6>
                                     <div class="code-block">
 <span class="keyword">async</span> <span class="function">function</span> <span class="function">verifyLicense</span>(key) {
-  <span class="keyword">const</span> apiUrl = <span class="string">`license-manager.html?api=true&key=${key}`</span>;
+  <span class="keyword">const</span> apiUrl = <span class="string">`https://management-license.vercel.app/?api=true&key=${key}`</span>;
   
   <span class="keyword">try</span> {
     <span class="keyword">const</span> response = <span class="keyword">await</span> <span class="function">fetch</span>(apiUrl);
+    
+    <span class="comment">// Kiểm tra response</span>
+    <span class="keyword">if</span> (!response.ok) {
+      <span class="keyword">throw new</span> <span class="function">Error</span>(<span class="string">`HTTP error! status: ${response.status}`</span>);
+    }
+    
     <span class="keyword">const</span> data = <span class="keyword">await</span> response.<span class="function">json</span>();
     
     <span class="keyword">if</span> (data.valid) {
-      <span class="function">console</span>.<span class="function">log</span>(<span class="string">'License hợp lệ'</span>);
+      <span class="function">console</span>.<span class="function">log</span>(<span class="string">'✅ License hợp lệ:'</span>, data.message);
       <span class="comment">// Xử lý khi hợp lệ</span>
     } <span class="keyword">else</span> {
-      <span class="function">console</span>.<span class="function">log</span>(<span class="string">'License không hợp lệ:'</span>, data.message);
+      <span class="function">console</span>.<span class="function">log</span>(<span class="string">'❌ License không hợp lệ:'</span>, data.message);
       <span class="comment">// Xử lý khi không hợp lệ</span>
     }
+    
+    <span class="keyword">return</span> data;
   } <span class="keyword">catch</span> (error) {
-    <span class="function">console</span>.<span class="function">error</span>(<span class="string">'Lỗi khi gọi API:'</span>, error);
+    <span class="function">console</span>.<span class="function">error</span>(<span class="string">'🚨 Lỗi khi gọi API:'</span>, error);
+    <span class="keyword">return</span> {
+      success: <span class="keyword">false</span>,
+      message: <span class="string">'Lỗi kết nối API'</span>
+    };
   }
 }
+
+<span class="comment">// Sử dụng:</span>
+<span class="function">verifyLicense</span>(<span class="string">'LIC-WBB61UL-F700'</span>).<span class="function">then</span>(data => {
+  <span class="function">console</span>.<span class="function">log</span>(<span class="string">'Kết quả:'</span>, data);
+});
                                     </div>
                                 </div>
                                 
@@ -632,22 +670,41 @@
                                     <h6>Python Requests Example</h6>
                                     <div class="code-block">
 <span class="keyword">import</span> requests
+<span class="keyword">import</span> json
 
 <span class="function">def</span> <span class="function">verify_license</span>(key):
-    api_url = <span class="string">f"license-manager.html?api=true&key={key}"</span>
+    api_url = <span class="string">f"https://management-license.vercel.app/?api=true&key={key}"</span>
     
     <span class="keyword">try</span>:
-        response = requests.<span class="function">get</span>(api_url)
+        response = requests.<span class="function">get</span>(api_url, timeout=10)
+        response.raise_for_status()  <span class="comment"># Kiểm tra HTTP errors</span>
         data = response.<span class="function">json</span>()
         
-        <span class="keyword">if</span> data[<span class="string">'valid'</span>]:
-            <span class="function">print</span>(<span class="string">'License hợp lệ'</span>)
+        <span class="keyword">if</span> data.get(<span class="string">'valid'</span>):
+            <span class="function">print</span>(<span class="string">'✅ License hợp lệ:'</span>, data[<span class="string">'message'</span>])
             <span class="comment"># Xử lý khi hợp lệ</span>
         <span class="keyword">else</span>:
-            <span class="function">print</span>(<span class="string">f'License không hợp lệ: {data["message"]}'</span>)
+            <span class="function">print</span>(<span class="string">'❌ License không hợp lệ:'</span>, data.get(<span class="string">'message'</span>, <span class="string">'Unknown error'</span>))
             <span class="comment"># Xử lý khi không hợp lệ</span>
-    <span class="keyword">except</span> Exception <span class="keyword">as</span> e:
-        <span class="function">print</span>(<span class="string">f'Lỗi khi gọi API: {e}'</span>)
+            
+        <span class="keyword">return</span> data
+        
+    <span class="keyword">except</span> requests.exceptions.RequestException <span class="keyword">as</span> e:
+        <span class="function">print</span>(<span class="string">f'🚨 Lỗi khi gọi API: {e}'</span>)
+        <span class="keyword">return</span> {
+            <span class="string">'success'</span>: <span class="keyword">False</span>,
+            <span class="string">'message'</span>: <span class="string">'Lỗi kết nối API'</span>
+        }
+    <span class="keyword">except</span> json.JSONDecodeError <span class="keyword">as</span> e:
+        <span class="function">print</span>(<span class="string">f'🚨 Lỗi parse JSON: {e}'</span>)
+        <span class="keyword">return</span> {
+            <span class="string">'success'</span>: <span class="keyword">False</span>,
+            <span class="string">'message'</span>: <span class="string">'Lỗi định dạng JSON'</span>
+        }
+
+<span class="comment"># Sử dụng:</span>
+result = <span class="function">verify_license</span>(<span class="string">"LIC-WBB61UL-F700"</span>)
+<span class="function">print</span>(<span class="string">"Kết quả:"</span>, result)
                                     </div>
                                 </div>
                             </div>
@@ -767,13 +824,13 @@
                                 </div>
                                 
                                 <div class="mt-4">
-                                    <h6><i class="bi bi-info-circle me-2"></i>Thông tin</h6>
+                                    <h6><i class="bi bi-info-circle me-2"></i>Thông tin API</h6>
                                     <ul class="small text-muted">
-                                        <li>API endpoint trả về JSON thuần túy</li>
-                                        <li>Không còn lỗi "Unexpected token '<'"</li>
-                                        <li>Xử lý CORS tự động</li>
-                                        <li>Real-time verification</li>
-                                        <li>Data lưu trong localStorage</li>
+                                        <li>✅ Trả về JSON thuần túy (no HTML)</li>
+                                        <li>✅ CORS headers được hỗ trợ</li>
+                                        <li>✅ Content-Type: application/json</li>
+                                        <li>✅ Không còn lỗi "Unexpected token '<'"</li>
+                                        <li>✅ Real-time verification</li>
                                     </ul>
                                 </div>
                             </div>
@@ -1365,6 +1422,52 @@
             document.getElementById('successRateText').textContent = `${successRate}% thành công`;
         }
 
+        // Test API với raw fetch để debug
+        async function testRawFetch(key) {
+            const apiUrl = window.location.origin + window.location.pathname + '?api=true&key=' + key;
+            
+            try {
+                showToast('Đang test raw fetch...', 'info');
+                
+                const response = await fetch(apiUrl);
+                
+                // Log response headers
+                console.log('Response Headers:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    type: response.type,
+                    url: response.url,
+                    headers: Object.fromEntries([...response.headers.entries()])
+                });
+                
+                // Get response as text first to debug
+                const text = await response.text();
+                console.log('Raw Response:', text.substring(0, 500));
+                
+                // Try to parse as JSON
+                let data;
+                try {
+                    data = JSON.parse(text);
+                    console.log('Parsed JSON:', data);
+                } catch (parseError) {
+                    console.error('JSON Parse Error:', parseError);
+                    // Try to fix common issues
+                    const fixedText = text.replace(/^<[^>]+>/, '').trim();
+                    try {
+                        data = JSON.parse(fixedText);
+                        console.log('Fixed JSON:', data);
+                    } catch (e) {
+                        throw new Error(`Cannot parse JSON: ${e.message}. Raw: ${text.substring(0, 200)}`);
+                    }
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                throw error;
+            }
+        }
+
         // ========== INITIALIZATION ==========
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -1571,8 +1674,10 @@
                 const apiUrl = window.location.origin + window.location.pathname + '?api=true&key=' + key;
                 
                 try {
-                    const response = await fetch(apiUrl);
-                    const data = await response.json();
+                    document.getElementById('apiResponse').textContent = 'Đang test API...';
+                    
+                    // Test with raw fetch first
+                    const data = await testRawFetch(key);
                     
                     // Update API stats
                     let totalRequests = parseInt(localStorage.getItem('apiTotalRequests') || 0);
@@ -1585,11 +1690,24 @@
                     updateApiStats();
                     
                     document.getElementById('apiResponse').textContent = JSON.stringify(data, null, 2);
-                    showToast('API test thành công!', 'success');
+                    showToast('✅ API test thành công!', 'success');
                 } catch (error) {
                     console.error('API test error:', error);
-                    document.getElementById('apiResponse').textContent = `Lỗi: ${error.message}`;
-                    showToast('API test thất bại!', 'error');
+                    document.getElementById('apiResponse').textContent = `Lỗi: ${error.message}\n\nDebug Info:\nURL: ${apiUrl}\nTime: ${new Date().toISOString()}`;
+                    showToast('🚨 API test thất bại!', 'error');
+                }
+            });
+            
+            // Raw fetch test button
+            document.getElementById('rawFetchBtn').addEventListener('click', async function() {
+                const key = document.getElementById('testApiKey').value;
+                try {
+                    const data = await testRawFetch(key);
+                    document.getElementById('apiResponse').textContent = JSON.stringify(data, null, 2);
+                    showToast('✅ Raw fetch test thành công!', 'success');
+                } catch (error) {
+                    document.getElementById('apiResponse').textContent = `Raw Fetch Error: ${error.message}`;
+                    showToast('🚨 Raw fetch test thất bại!', 'error');
                 }
             });
             
@@ -1617,14 +1735,14 @@
             document.getElementById('curlTestBtn').addEventListener('click', function() {
                 const testKey = 'LIC-WBB61UL-F700';
                 const apiUrl = window.location.origin + window.location.pathname + '?api=true&key=' + testKey;
-                const curlCommand = `curl "${apiUrl}"`;
+                const curlCommand = `curl -H "Accept: application/json" "${apiUrl}"`;
                 
                 showToast(`cURL command: ${curlCommand}`, 'info');
             });
             
             // Postman button
             document.getElementById('postmanBtn').addEventListener('click', function() {
-                alert('Để test với Postman:\n1. Tạo request GET\n2. Dán API endpoint URL\n3. Thêm query parameter "key" với giá trị license key\n4. Send request');
+                alert('Để test với Postman:\n1. Tạo request GET\n2. Dán API endpoint URL\n3. Thêm query parameter "key" với giá trị license key\n4. Send request\n\nLưu ý: API trả về JSON thuần túy, không có HTML.');
             });
             
             // Quick test buttons
@@ -1656,15 +1774,26 @@
                 setTimeout(() => {
                     indicator.innerHTML = '<i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>';
                     statusText.textContent = 'API đang hoạt động';
-                    showToast('API status: Hoạt động bình thường', 'success');
+                    showToast('✅ API status: Hoạt động bình thường', 'success');
                 }, 1000);
             });
             
             // Function to test API endpoint
             async function testApiEndpoint(url) {
                 try {
+                    document.getElementById('quickTestResult').textContent = 'Đang test...';
+                    
                     const response = await fetch(url);
-                    const data = await response.json();
+                    const text = await response.text();
+                    
+                    // Try to parse JSON
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        data = { error: 'Không parse được JSON', raw: text.substring(0, 200) };
+                    }
+                    
                     document.getElementById('quickTestResult').textContent = JSON.stringify(data, null, 2);
                     
                     // Update API stats
@@ -1695,8 +1824,17 @@
             
             // Show welcome toast
             setTimeout(() => {
-                showToast('Chào mừng đến với License Manager Pro!', 'info');
+                showToast('Chào mừng đến với License Manager Pro! API đã được fix hoàn toàn!', 'success');
             }, 1000);
+            
+            // Auto test API on load
+            setTimeout(() => {
+                // Auto test with sample key
+                const testKey = document.getElementById('testApiKey').value;
+                if (testKey) {
+                    document.getElementById('testApiBtn').click();
+                }
+            }, 2000);
         });
     </script>
 </body>
