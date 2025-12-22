@@ -64,40 +64,74 @@ export default async function handler(req, res) {
 
     // 3) Đọc từ GitHub raw (public) để lấy bản mới nhất nếu KV chưa có hoặc sync GitHub thất bại
     try {
-      const fetch = require('node-fetch');
+      // Sử dụng global fetch (có sẵn trong Node 18+ và Vercel)
       const owner = process.env.GITHUB_REPO_OWNER || 'ncdathwb';
       const repo = process.env.GITHUB_REPO_NAME || 'ManagementLicense';
       const branch = process.env.GITHUB_REPO_BRANCH || 'main';
       const githubUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/licenses.json`;
-      const ghResp = await fetch(githubUrl, { timeout: 7000 });
-      if (ghResp.ok) {
-        const ghText = await ghResp.text();
-        const ghJson = JSON.parse(ghText);
-        if (Array.isArray(ghJson) && ghJson.length > 0) {
-          licensesFromGitHub = ghJson;
-          console.log('[VERIFY] Loaded licenses from GitHub raw:', ghJson.length);
+      
+      // Thêm timeout với AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      
+      try {
+        const ghResp = await fetch(githubUrl, { 
+          signal: controller.signal,
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        clearTimeout(timeoutId);
+        
+        if (ghResp.ok) {
+          const ghText = await ghResp.text();
+          const ghJson = JSON.parse(ghText);
+          if (Array.isArray(ghJson) && ghJson.length > 0) {
+            licensesFromGitHub = ghJson;
+            console.log('[VERIFY] Loaded licenses from GitHub raw:', ghJson.length);
+          }
+        } else {
+          console.log('[VERIFY] GitHub raw fetch status:', ghResp.status);
         }
-      } else {
-        console.log('[VERIFY] GitHub raw fetch status:', ghResp.status);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.log('[VERIFY] GitHub fetch timeout after 7 seconds');
+        } else {
+          throw fetchError;
+        }
       }
     } catch (e) {
       console.log('[VERIFY] Cannot load licenses from GitHub raw:', e.message);
     }
 
-    // 3) Gộp: ưu tiên KV (nếu có), nếu KV thiếu key thì lấy từ file, cuối cùng lấy static
+    // 3) Gộp: So sánh timestamp để ưu tiên version mới hơn (giống logic trong index.html)
+    // Đảm bảo dữ liệu mới nhất từ mọi nguồn đều được giữ lại
     const licenseMap = new Map();
-    for (const lic of licensesFromStatic) {
-      if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
-    }
-    for (const lic of licensesFromFile) {
-      if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
-    }
-    for (const lic of licensesFromGitHub) {
-      if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
-    }
-    for (const lic of licensesFromKv) {
-      if (lic && lic.key) licenseMap.set(String(lic.key).trim().toUpperCase(), lic);
-    }
+    
+    // Thêm tất cả licenses vào map, so sánh timestamp nếu trùng key
+    [...licensesFromStatic, ...licensesFromFile, ...licensesFromGitHub, ...licensesFromKv].forEach(lic => {
+      if (lic && lic.key) {
+        const key = String(lic.key).trim().toUpperCase();
+        const existing = licenseMap.get(key);
+        
+        if (!existing) {
+          // Key chưa có, thêm vào
+          licenseMap.set(key, lic);
+        } else {
+          // Key đã có, so sánh timestamp để giữ version mới hơn
+          const existingUpdated = existing.updated ? new Date(existing.updated).getTime() : 0;
+          const licUpdated = lic.updated ? new Date(lic.updated).getTime() : 0;
+          
+          // Nếu license mới hơn (updated timestamp lớn hơn), thay thế
+          if (licUpdated > existingUpdated) {
+            licenseMap.set(key, lic);
+            console.log(`[VERIFY] Merged: Keeping newer version of key ${key} (${lic.updated} vs ${existing.updated})`);
+          }
+        }
+      }
+    });
+    
     const licenses = Array.from(licenseMap.values());
 
     // Tìm license

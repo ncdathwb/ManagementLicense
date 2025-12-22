@@ -14,15 +14,81 @@ export default async function handler(req, res) {
       });
     }
 
+    // Validation: Kiểm tra format của mỗi license
+    const validatedLicenses = [];
+    const seenKeys = new Set();
+    
+    for (const lic of licenses) {
+      // Kiểm tra cấu trúc cơ bản
+      if (!lic || typeof lic !== 'object') {
+        console.warn('[SYNC] Skipping invalid license (not an object):', lic);
+        continue;
+      }
+      
+      // Kiểm tra key bắt buộc
+      if (!lic.key || typeof lic.key !== 'string' || !lic.key.trim()) {
+        console.warn('[SYNC] Skipping license without valid key:', lic);
+        continue;
+      }
+      
+      // Kiểm tra key trùng
+      const normalizedKey = String(lic.key).trim().toUpperCase();
+      if (seenKeys.has(normalizedKey)) {
+        console.warn(`[SYNC] Skipping duplicate key: ${normalizedKey}`);
+        continue;
+      }
+      seenKeys.add(normalizedKey);
+      
+      // Kiểm tra expiry
+      if (!lic.expiry) {
+        console.warn(`[SYNC] License ${normalizedKey} missing expiry date`);
+        continue;
+      }
+      
+      // Validate expiry là date hợp lệ
+      const expiryDate = new Date(lic.expiry);
+      if (isNaN(expiryDate.getTime())) {
+        console.warn(`[SYNC] License ${normalizedKey} has invalid expiry date: ${lic.expiry}`);
+        continue;
+      }
+      
+      // Đảm bảo có các trường cần thiết
+      const validatedLic = {
+        key: normalizedKey,
+        expiry: expiryDate.toISOString(),
+        note: lic.note || '',
+        created: lic.created || new Date().toISOString(),
+        updated: lic.updated || new Date().toISOString()
+      };
+      
+      validatedLicenses.push(validatedLic);
+    }
+    
+    // Nếu sau validation không còn license nào hợp lệ
+    if (validatedLicenses.length === 0 && licenses.length > 0) {
+      return res.status(400).json({
+        error: 'No valid licenses found after validation',
+        message: 'All licenses failed validation. Please check the format.'
+      });
+    }
+    
+    // Log nếu có licenses bị loại bỏ
+    if (validatedLicenses.length < licenses.length) {
+      console.warn(`[SYNC] Validated ${validatedLicenses.length} out of ${licenses.length} licenses`);
+    }
+    
+    // Sử dụng validated licenses thay vì licenses gốc
+    const licensesToSync = validatedLicenses;
+
     // Lưu vào Vercel KV (nếu có) hoặc file JSON
     try {
       const { kv } = require('@vercel/kv');
       if (kv) {
-        await kv.set('licenses', licenses);
+        await kv.set('licenses', licensesToSync);
         return res.status(200).json({ 
           success: true, 
           message: 'Licenses synced to Vercel KV',
-          count: licenses.length
+          count: licensesToSync.length
         });
       }
     } catch (e) {
@@ -69,7 +135,8 @@ export default async function handler(req, res) {
         }
 
         // 2. Tạo nội dung file mới (base64 encoded)
-        const fileContent = JSON.stringify(licenses, null, 2);
+        // Sử dụng validated licenses
+        const fileContent = JSON.stringify(licensesToSync, null, 2);
         const encodedContent = Buffer.from(fileContent).toString('base64');
 
         // 3. Commit file lên GitHub
@@ -106,7 +173,7 @@ export default async function handler(req, res) {
           return res.status(200).json({ 
             success: true, 
             message: 'Licenses synced and committed to GitHub automatically',
-            count: licenses.length,
+            count: licensesToSync.length,
             commit: {
               sha: commitResult.commit.sha,
               message: commitMessage,
@@ -115,10 +182,25 @@ export default async function handler(req, res) {
           });
         } else {
           console.error('[GITHUB] API error:', commitResponse.status, commitResult);
+          
+          // Kiểm tra nếu lỗi do SHA conflict (race condition)
+          if (commitResponse.status === 409 || (commitResult.message && commitResult.message.includes('sha'))) {
+            console.warn('[GITHUB] SHA conflict detected, file may have been updated by another device');
+            return res.status(200).json({ 
+              success: false, 
+              message: 'Sync failed due to concurrent update. Please try again.',
+              count: licensesToSync.length,
+              error: 'Concurrent update detected',
+              details: commitResult,
+              github_status: commitResponse.status,
+              retry: true
+            });
+          }
+          
           return res.status(200).json({ 
             success: false, 
             message: 'Sync successful but GitHub commit failed',
-            count: licenses.length,
+            count: licensesToSync.length,
             error: commitResult.message || 'Unknown error',
             details: commitResult,
             github_status: commitResponse.status
@@ -135,9 +217,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ 
         success: true, 
         message: 'Sync successful but auto-commit failed. Please download and commit manually.',
-        licenses: licenses,
+        licenses: licensesToSync,
         note: 'Save the licenses array above to licenses.json file',
-        json_content: JSON.stringify(licenses, null, 2)
+        json_content: JSON.stringify(licensesToSync, null, 2)
       });
     }
   } catch (error) {
