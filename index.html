@@ -1726,9 +1726,29 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 
                 // Lắng nghe thay đổi localStorage từ tab khác
                 window.addEventListener('storage', refreshLicensesIfChanged);
+                
                 // Interval để phát hiện thay đổi localStorage trong cùng tab và reload từ GitHub
                 // Lưu interval ID để có thể cleanup khi cần
-                const refreshIntervalId = setInterval(refreshLicensesIfChanged, 5000);
+                // Giảm xuống 2 giây để đồng bộ realtime
+                const refreshIntervalId = setInterval(refreshLicensesIfChanged, 2000);
+                
+                // Reload ngay khi tab/window trở nên visible (user quay lại tab)
+                document.addEventListener('visibilitychange', function() {
+                    if (!document.hidden) {
+                        console.log('[VISIBILITY] Tab became visible, reloading from GitHub...');
+                        // Reset lastGitHubRefresh để force reload ngay
+                        lastGitHubRefresh = 0;
+                        refreshLicensesIfChanged();
+                    }
+                });
+                
+                // Reload ngay khi window focus (user quay lại window)
+                window.addEventListener('focus', function() {
+                    console.log('[FOCUS] Window focused, reloading from GitHub...');
+                    // Reset lastGitHubRefresh để force reload ngay
+                    lastGitHubRefresh = 0;
+                    refreshLicensesIfChanged();
+                });
                 
                 // Cleanup interval khi page unload
                 window.addEventListener('beforeunload', function() {
@@ -1966,8 +1986,11 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         signal: controller.signal,
                         headers: { 
                             'Accept': 'application/json',
-                            'Cache-Control': 'no-cache, no-store, must-revalidate',
-                            'Pragma': 'no-cache'
+                            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+                            'Pragma': 'no-cache',
+                            'Expires': '0',
+                            'If-None-Match': '*', // Force revalidation
+                            'If-Modified-Since': '0' // Force revalidation
                         }
                     });
                     clearTimeout(timeoutId);
@@ -2073,7 +2096,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
         // Tự động refresh UI khi localStorage thay đổi (cùng tab hoặc tab khác)
         // Cũng reload từ GitHub định kỳ để đồng bộ giữa các thiết bị
         let lastGitHubRefresh = 0;
-        const GITHUB_REFRESH_INTERVAL = 5000; // Refresh từ GitHub mỗi 5 giây (giảm từ 10s để sync nhanh hơn)
+        const GITHUB_REFRESH_INTERVAL = 2000; // Refresh từ GitHub mỗi 2 giây để đồng bộ realtime
         let isLoadingFromGitHub = false; // Flag để tránh multiple concurrent reloads
         
         async function refreshLicensesIfChanged() {
@@ -2096,18 +2119,25 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 // Định kỳ reload từ GitHub để đồng bộ giữa các thiết bị
                 // Tránh multiple concurrent reloads
                 const now = Date.now();
-                if (now - lastGitHubRefresh >= GITHUB_REFRESH_INTERVAL && !isLoadingFromGitHub) {
+                // Force reload nếu lastGitHubRefresh = 0 (được set khi visibility/focus)
+                const shouldReload = (now - lastGitHubRefresh >= GITHUB_REFRESH_INTERVAL || lastGitHubRefresh === 0) && !isLoadingFromGitHub;
+                
+                if (shouldReload) {
                     lastGitHubRefresh = now;
                     isLoadingFromGitHub = true;
                     try {
                         await loadLicenses();
-                        // Chỉ render nếu dữ liệu thực sự thay đổi
+                        // Luôn render để đảm bảo UI cập nhật (không chỉ khi thay đổi)
+                        // Vì có thể số lượng giống nhưng dữ liệu bên trong đã thay đổi
                         const newData = JSON.stringify(licenses);
                         if (newData !== lastLicensesSnapshot) {
                             lastLicensesSnapshot = newData;
                             renderLicenses();
                             updateStats();
                             console.log('[REFRESH] UI updated from GitHub');
+                        } else {
+                            // Vẫn update stats để đảm bảo số lượng hiển thị đúng
+                            updateStats();
                         }
                     } catch (e) {
                         console.log('[REFRESH] Could not refresh from GitHub:', e.message);
@@ -3061,6 +3091,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
         }
 
         // Cập nhật thống kê
+        // Cập nhật thống kê - luôn tính toán từ licenses hiện tại để đảm bảo chính xác
         function updateStats() {
             let valid = 0, expiring = 0, expired = 0;
             
