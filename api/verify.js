@@ -84,12 +84,21 @@ export default async function handler(req, res) {
         clearTimeout(timeoutId);
         
         if (ghResp.ok) {
-          const ghText = await ghResp.text();
-          const ghJson = JSON.parse(ghText);
-          if (Array.isArray(ghJson) && ghJson.length > 0) {
-            licensesFromGitHub = ghJson;
-            console.log('[VERIFY] Loaded licenses from GitHub raw:', ghJson.length);
+          try {
+            const ghText = await ghResp.text();
+            const ghJson = JSON.parse(ghText);
+            if (Array.isArray(ghJson) && ghJson.length > 0) {
+              licensesFromGitHub = ghJson;
+              console.log('[VERIFY] Loaded licenses from GitHub raw:', ghJson.length);
+            }
+          } catch (parseError) {
+            console.error('[VERIFY] Error parsing JSON from GitHub:', parseError.message);
+            // Tiếp tục với dữ liệu rỗng, sẽ dùng nguồn khác
           }
+        } else if (ghResp.status === 429) {
+          // GitHub API rate limit exceeded
+          console.warn('[VERIFY] GitHub API rate limit exceeded (429)');
+          // Tiếp tục với dữ liệu từ nguồn khác
         } else {
           console.log('[VERIFY] GitHub raw fetch status:', ghResp.status);
         }

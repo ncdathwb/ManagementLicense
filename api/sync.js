@@ -126,8 +126,23 @@ export default async function handler(req, res) {
             console.log('[GITHUB] Found existing file, SHA:', currentSha);
           } else if (getFileResponse.status === 404) {
             console.log('[GITHUB] File does not exist, will create new file');
+          } else if (getFileResponse.status === 429) {
+            // GitHub API rate limit exceeded
+            const retryAfter = getFileResponse.headers.get('Retry-After');
+            console.error(`[GITHUB] Rate limit exceeded (429). Retry after: ${retryAfter || 'unknown'} seconds`);
+            return res.status(429).json({
+              success: false,
+              error: 'GitHub API rate limit exceeded',
+              message: `Rate limit exceeded. Please retry after ${retryAfter || 'some'} seconds.`,
+              retry_after: retryAfter ? parseInt(retryAfter) : null
+            });
           } else {
-            const errorData = await getFileResponse.json();
+            let errorData = {};
+            try {
+              errorData = await getFileResponse.json();
+            } catch (e) {
+              errorData = { message: 'Unknown error' };
+            }
             console.error('[GITHUB] Error getting file:', getFileResponse.status, errorData);
           }
         } catch (e) {
@@ -179,6 +194,17 @@ export default async function handler(req, res) {
               message: commitMessage,
               url: commitResult.commit.html_url
             }
+          });
+        } else if (commitResponse.status === 429) {
+          // GitHub API rate limit exceeded
+          const retryAfter = commitResponse.headers.get('Retry-After');
+          console.error(`[GITHUB] Rate limit exceeded (429). Retry after: ${retryAfter || 'unknown'} seconds`);
+          return res.status(429).json({
+            success: false,
+            error: 'GitHub API rate limit exceeded',
+            message: `Rate limit exceeded. Please retry after ${retryAfter || 'some'} seconds.`,
+            count: licensesToSync.length,
+            retry_after: retryAfter ? parseInt(retryAfter) : null
           });
         } else {
           console.error('[GITHUB] API error:', commitResponse.status, commitResult);

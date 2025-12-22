@@ -1846,28 +1846,53 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         // Không lưu được lên server/GitHub -> cảnh báo để biết dữ liệu chỉ ở local
                         showToast('⚠️ Sync chưa lưu lên server. Dữ liệu chỉ tồn tại trên thiết bị này. Vui lòng kiểm tra cấu hình GITHUB_TOKEN/Vercel KV.', 'warning', 8000);
                     } else if (committedToGit) {
-                        // Nếu commit thành công lên GitHub, đợi một chút rồi reload từ GitHub để cập nhật UI
-                        console.log('[SYNC] GitHub commit successful, will reload from GitHub in 2 seconds...');
-                        setTimeout(async () => {
+                        // Nếu commit thành công lên GitHub, reload ngay và retry nếu cần
+                        console.log('[SYNC] GitHub commit successful, will reload from GitHub...');
+                        
+                        // Hàm reload với retry logic
+                        const reloadWithRetry = async (attempt = 1, maxAttempts = 3) => {
                             // Tránh reload nếu đang có reload khác đang chạy
                             if (isLoadingFromGitHub) {
                                 console.log('[SYNC] Skipping reload, another reload is in progress');
                                 return;
                             }
+                            
                             try {
                                 isLoadingFromGitHub = true;
+                                
+                                // Thêm delay tăng dần: attempt 1 = 1s, attempt 2 = 2s, attempt 3 = 3s
+                                const delay = attempt * 1000;
+                                if (attempt > 1) {
+                                    console.log(`[SYNC] Retry attempt ${attempt} after ${delay}ms...`);
+                                    await new Promise(resolve => setTimeout(resolve, delay));
+                                }
+                                
                                 await loadLicenses();
                                 renderLicenses();
                                 updateStats();
                                 // Cập nhật lastGitHubRefresh để tránh reload lại ngay
                                 lastGitHubRefresh = Date.now();
-                                console.log('[SYNC] UI refreshed from GitHub after sync');
+                                console.log(`[SYNC] UI refreshed from GitHub after sync (attempt ${attempt})`);
+                                
+                                // Nếu đây là attempt đầu tiên và dữ liệu có thể chưa cập nhật, retry thêm 1 lần nữa sau 2 giây
+                                if (attempt === 1 && maxAttempts > 1) {
+                                    setTimeout(() => reloadWithRetry(2, maxAttempts), 2000);
+                                }
                             } catch (e) {
-                                console.error('[SYNC] Error reloading from GitHub after sync:', e);
+                                console.error(`[SYNC] Error reloading from GitHub (attempt ${attempt}):`, e);
+                                // Retry nếu chưa đạt max attempts
+                                if (attempt < maxAttempts) {
+                                    setTimeout(() => reloadWithRetry(attempt + 1, maxAttempts), delay);
+                                }
                             } finally {
-                                isLoadingFromGitHub = false;
+                                if (attempt >= maxAttempts) {
+                                    isLoadingFromGitHub = false;
+                                }
                             }
-                        }, 2000); // Đợi 2 giây để GitHub CDN cập nhật
+                        };
+                        
+                        // Bắt đầu reload ngay lập tức (không đợi)
+                        reloadWithRetry(1, 3);
                     }
                     console.log('[SYNC] Sync success:', result);
                 } else {
@@ -1925,8 +1950,10 @@ public class LicenseInterceptor implements HandlerInterceptor {
             let serverLicenses = [];
             try {
                 // Thêm cache-busting parameter để tránh cache CDN
+                // Sử dụng timestamp + random để đảm bảo không cache trên mobile
                 const timestamp = Date.now();
-                const githubRawUrl = `https://raw.githubusercontent.com/ncdathwb/ManagementLicense/main/licenses.json?t=${timestamp}`;
+                const random = Math.random().toString(36).substring(7);
+                const githubRawUrl = `https://raw.githubusercontent.com/ncdathwb/ManagementLicense/main/licenses.json?t=${timestamp}&r=${random}`;
                 
                 // Thêm timeout để tránh treo quá lâu
                 const controller = new AbortController();
@@ -1946,13 +1973,26 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     clearTimeout(timeoutId);
                     
                     if (response.ok) {
-                        const json = await response.json();
-                        if (Array.isArray(json)) {
-                            serverLicenses = json;
-                            console.log('[LOAD] Loaded licenses from GitHub:', serverLicenses.length);
-                        } else {
-                            console.warn('[LOAD] GitHub response is not an array:', typeof json);
+                        try {
+                            const json = await response.json();
+                            if (Array.isArray(json)) {
+                                serverLicenses = json;
+                                console.log('[LOAD] Loaded licenses from GitHub:', serverLicenses.length);
+                            } else {
+                                console.warn('[LOAD] GitHub response is not an array:', typeof json);
+                            }
+                        } catch (parseError) {
+                            console.error('[LOAD] Error parsing JSON from GitHub:', parseError);
+                            // Tiếp tục với dữ liệu rỗng, sẽ dùng localStorage
                         }
+                    } else if (response.status === 429) {
+                        // GitHub API rate limit exceeded
+                        console.warn('[LOAD] GitHub API rate limit exceeded (429)');
+                        const retryAfter = response.headers.get('Retry-After');
+                        if (retryAfter) {
+                            console.warn(`[LOAD] Retry after ${retryAfter} seconds`);
+                        }
+                        // Tiếp tục với localStorage, không báo lỗi vì có thể retry sau
                     } else {
                         console.warn(`[LOAD] GitHub response status: ${response.status}`);
                     }
@@ -1987,14 +2027,16 @@ public class LicenseInterceptor implements HandlerInterceptor {
             const map = new Map();
             
             // Thêm tất cả licenses vào map, so sánh timestamp nếu trùng key
+            // Normalize key để tránh duplicate do case sensitivity
             [...serverLicenses, ...localLicenses].forEach(item => {
                 if (item && item.key) {
-                    const key = item.key;
-                    const existing = map.get(key);
+                    // Normalize key: trim và uppercase để đảm bảo so sánh chính xác
+                    const normalizedKey = String(item.key).trim().toUpperCase();
+                    const existing = map.get(normalizedKey);
                     
                     if (!existing) {
-                        // Key chưa có, thêm vào
-                        map.set(key, item);
+                        // Key chưa có, thêm vào (đảm bảo key được normalize)
+                        map.set(normalizedKey, { ...item, key: normalizedKey });
                     } else {
                         // Key đã có, so sánh timestamp để giữ version mới hơn
                         const existingUpdated = existing.updated ? new Date(existing.updated).getTime() : 0;
@@ -2002,8 +2044,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         
                         // Nếu item mới hơn (updated timestamp lớn hơn), thay thế
                         if (itemUpdated > existingUpdated) {
-                            map.set(key, item);
-                            console.log(`[LOAD] Merged: Keeping newer version of key ${key} (${item.updated} vs ${existing.updated})`);
+                            map.set(normalizedKey, { ...item, key: normalizedKey });
+                            console.log(`[LOAD] Merged: Keeping newer version of key ${normalizedKey} (${item.updated} vs ${existing.updated})`);
                         }
                     }
                 }
@@ -2031,7 +2073,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
         // Tự động refresh UI khi localStorage thay đổi (cùng tab hoặc tab khác)
         // Cũng reload từ GitHub định kỳ để đồng bộ giữa các thiết bị
         let lastGitHubRefresh = 0;
-        const GITHUB_REFRESH_INTERVAL = 10000; // Refresh từ GitHub mỗi 10 giây
+        const GITHUB_REFRESH_INTERVAL = 5000; // Refresh từ GitHub mỗi 5 giây (giảm từ 10s để sync nhanh hơn)
         let isLoadingFromGitHub = false; // Flag để tránh multiple concurrent reloads
         
         async function refreshLicensesIfChanged() {
@@ -2463,6 +2505,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
             
             // BẮT BUỘC: Lưu và sync lên server/JSON sau mọi thay đổi
             saveLicenses();
+            
+            // Render ngay với dữ liệu local để UI responsive
             renderLicenses();
             updateStats();
             
@@ -2473,7 +2517,22 @@ public class LicenseInterceptor implements HandlerInterceptor {
             const modal = bootstrap.Modal.getInstance(document.getElementById('licenseModal'));
             modal.hide();
             
-            showToast(wasEditing ? 'Cập nhật thành công!' : 'Thêm license thành công!');
+            showToast(wasEditing ? 'Cập nhật thành công! Đang đồng bộ...' : 'Thêm license thành công! Đang đồng bộ...');
+            
+            // Force reload từ GitHub sau một chút để đảm bảo dữ liệu mới nhất
+            // Đặc biệt quan trọng trên mobile khi network có thể chậm
+            setTimeout(async () => {
+                try {
+                    if (!isLoadingFromGitHub) {
+                        await loadLicenses();
+                        renderLicenses();
+                        updateStats();
+                        console.log('[SAVE] Force reloaded from GitHub after save');
+                    }
+                } catch (e) {
+                    console.log('[SAVE] Could not force reload from GitHub:', e.message);
+                }
+            }, 3000); // Đợi 3 giây để GitHub CDN cập nhật
             
             return false;
         }
