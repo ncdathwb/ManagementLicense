@@ -1727,7 +1727,15 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 // Lắng nghe thay đổi localStorage từ tab khác
                 window.addEventListener('storage', refreshLicensesIfChanged);
                 // Interval để phát hiện thay đổi localStorage trong cùng tab và reload từ GitHub
-                setInterval(refreshLicensesIfChanged, 5000);
+                // Lưu interval ID để có thể cleanup khi cần
+                const refreshIntervalId = setInterval(refreshLicensesIfChanged, 5000);
+                
+                // Cleanup interval khi page unload
+                window.addEventListener('beforeunload', function() {
+                    if (refreshIntervalId) {
+                        clearInterval(refreshIntervalId);
+                    }
+                });
                 
                 // Xử lý verify từ URL (chỉ hiển thị UI, không trả JSON)
                 handleUrlVerification();
@@ -1883,9 +1891,21 @@ public class LicenseInterceptor implements HandlerInterceptor {
             try {
                 // Bước 1: Lưu vào localStorage trước (để UI hoạt động offline)
                 const licensesJson = JSON.stringify(licenses);
-                localStorage.setItem(STORAGE_KEY, licensesJson);
-                lastLicensesSnapshot = licensesJson; // Cập nhật snapshot ngay lập tức
-                console.log('[SAVE] Đã lưu vào localStorage. Số lượng licenses:', licenses.length);
+                
+                try {
+                    localStorage.setItem(STORAGE_KEY, licensesJson);
+                    lastLicensesSnapshot = licensesJson; // Cập nhật snapshot ngay lập tức
+                    console.log('[SAVE] Đã lưu vào localStorage. Số lượng licenses:', licenses.length);
+                } catch (storageError) {
+                    // Xử lý lỗi localStorage quota exceeded
+                    if (storageError.name === 'QuotaExceededError' || storageError.code === 22) {
+                        console.error('[SAVE] LocalStorage quota exceeded:', storageError);
+                        showToast('⚠️ Dữ liệu quá lớn, không thể lưu vào localStorage. Đang sync trực tiếp lên server...', 'warning', 8000);
+                        // Vẫn tiếp tục sync lên server dù localStorage fail
+                    } else {
+                        throw storageError;
+                    }
+                }
                 
                 // Bước 2: BẮT BUỘC sync lên server để tự động commit lên GitHub
                 // Mọi thay đổi license (thêm, sửa, xóa) đều phải sync để tự động commit lên GitHub
@@ -1996,7 +2016,13 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
                 lastLicensesSnapshot = JSON.stringify(licenses);
             } catch (e) {
-                console.warn('[LOAD] Could not save merged data to localStorage:', e);
+                // Xử lý lỗi localStorage quota
+                if (e.name === 'QuotaExceededError' || e.code === 22) {
+                    console.warn('[LOAD] LocalStorage quota exceeded, data too large to cache');
+                    // Vẫn tiếp tục, chỉ không cache được
+                } else {
+                    console.warn('[LOAD] Could not save merged data to localStorage:', e);
+                }
             }
 
             console.log('[LOAD] Final licenses after merge:', licenses.length);
@@ -2372,6 +2398,25 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 return false;
             }
             
+            // Validation: Kiểm tra format key (chỉ cho phép chữ, số, dấu gạch ngang và gạch dưới)
+            const keyPattern = /^[A-Z0-9\-_]+$/;
+            if (!keyPattern.test(key)) {
+                showModalAlert('License key chỉ được chứa chữ cái, số, dấu gạch ngang (-) và gạch dưới (_)', 'Key không hợp lệ', 'warning');
+                return false;
+            }
+            
+            // Validation: Kiểm tra độ dài key (tối đa 100 ký tự)
+            if (key.length > 100) {
+                showModalAlert('License key không được vượt quá 100 ký tự', 'Key quá dài', 'warning');
+                return false;
+            }
+            
+            // Validation: Kiểm tra độ dài note (tối đa 500 ký tự)
+            if (note.length > 500) {
+                showModalAlert('Ghi chú không được vượt quá 500 ký tự', 'Ghi chú quá dài', 'warning');
+                return false;
+            }
+            
             // Kiểm tra key trùng
             if (!currentEditKey && licenses.some(l => l.key === key)) {
                 showModalAlert('License key đã tồn tại! Vui lòng chọn key khác.', 'Key trùng lặp', 'warning');
@@ -2379,6 +2424,12 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
             
             const expiryDate = new Date(expiry);
+            
+            // Validation: Kiểm tra date hợp lệ
+            if (isNaN(expiryDate.getTime())) {
+                showModalAlert('Ngày hết hạn không hợp lệ', 'Lỗi định dạng ngày', 'error');
+                return false;
+            }
             
             if (currentEditKey) {
                 // CẬP NHẬT license hiện có
