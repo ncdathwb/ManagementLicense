@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Force no-cache để đảm bảo luôn load file mới nhất -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>License Manager với Verify Online</title>
     <!-- JSON API Response cho ?verify= -->
     <script>
@@ -1536,12 +1540,15 @@ public class LicenseInterceptor implements HandlerInterceptor {
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <!-- QRCode.js với fallback -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" 
-            onerror="loadQRCodeFallback()"></script>
     <script>
-        // Fallback nếu CDN không load được
-        function loadQRCodeFallback() {
+        // Fallback nếu CDN không load được - Định nghĩa TRƯỚC khi sử dụng
+        // Phải định nghĩa trong window để có thể gọi từ onerror attribute
+        window.loadQRCodeFallback = function() {
             console.warn('QRCode CDN failed, trying alternative...');
+            if (window.QRCodeLoadFailed) {
+                console.error('All QRCode CDN sources already failed, skipping retry');
+                return;
+            }
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js';
             script.onerror = function() {
@@ -1553,7 +1560,13 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 window.QRCodeLoaded = true;
             };
             document.head.appendChild(script);
-        }
+        };
+        // Cũng định nghĩa global function để tương thích
+        var loadQRCodeFallback = window.loadQRCodeFallback;
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" 
+            onerror="if(typeof loadQRCodeFallback !== 'undefined') loadQRCodeFallback(); else if(typeof window.loadQRCodeFallback !== 'undefined') window.loadQRCodeFallback();"></script>
+    <script>
         
         // Kiểm tra QRCode đã load chưa sau khi page load
         window.addEventListener('load', function() {
@@ -1729,8 +1742,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 
                 // Interval để phát hiện thay đổi localStorage trong cùng tab và reload từ GitHub
                 // Lưu interval ID để có thể cleanup khi cần
-                // Giảm xuống 2 giây để đồng bộ realtime
-                const refreshIntervalId = setInterval(refreshLicensesIfChanged, 2000);
+                // Giảm xuống 1 giây để đồng bộ realtime nhanh hơn giữa các thiết bị
+                const refreshIntervalId = setInterval(refreshLicensesIfChanged, 1000);
                 
                 // Reload ngay khi tab/window trở nên visible (user quay lại tab)
                 document.addEventListener('visibilitychange', function() {
@@ -1859,6 +1872,35 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 const result = await response.json();
                 console.log('[SYNC] Full response:', result);
                 
+                // Xử lý race condition (concurrent update)
+                if (result.retry && result.error === 'Concurrent update detected') {
+                    console.warn('[SYNC] Race condition detected, reloading and retrying...');
+                    // Reload dữ liệu mới nhất từ server trước khi retry
+                    try {
+                        await loadLicenses();
+                        // Retry sync với dữ liệu mới nhất
+                        const retryResponse = await fetch(`${window.location.origin}/api/sync`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ licenses: licenses })
+                        });
+                        const retryResult = await retryResponse.json();
+                        if (retryResult.success) {
+                            showToast('✅ Đã đồng bộ thành công sau khi reload dữ liệu mới nhất!', 'success', 5000);
+                            console.log('[SYNC] Retry successful after reload');
+                        } else {
+                            showToast('⚠️ Vẫn có conflict sau khi reload. Vui lòng thử lại sau vài giây.', 'warning', 8000);
+                        }
+                        return; // Không tiếp tục logic bên dưới
+                    } catch (retryError) {
+                        console.error('[SYNC] Error during retry:', retryError);
+                        showToast('⚠️ Có conflict khi sync. Vui lòng reload trang và thử lại.', 'warning', 8000);
+                        return;
+                    }
+                }
+                
                 if (result.success) {
                     const syncedToKV = result.message && result.message.includes('Vercel KV');
                     const committedToGit = result.commit && result.commit.sha;
@@ -1880,13 +1922,13 @@ public class LicenseInterceptor implements HandlerInterceptor {
                             try {
                                 isLoadingFromGitHub = true;
                                 
-                                // Thêm delay tăng dần: attempt 1 = 1s, attempt 2 = 2s, attempt 3 = 3s
-                                const delay = attempt * 1000;
-                                if (attempt > 1) {
-                                    console.log(`[SYNC] Retry attempt ${attempt} after ${delay}ms...`);
-                                    await new Promise(resolve => setTimeout(resolve, delay));
-                                }
+                                // Thêm delay tăng dần: attempt 1 = 2s (đợi GitHub cập nhật), attempt 2 = 3s, attempt 3 = 4s
+                                const delay = (attempt + 1) * 1000; // 2s, 3s, 4s
+                                console.log(`[SYNC] Waiting ${delay}ms for GitHub to update (attempt ${attempt})...`);
+                                await new Promise(resolve => setTimeout(resolve, delay));
                                 
+                                // Reset cache-busting để force reload dữ liệu mới
+                                lastServerDataHash = null;
                                 await loadLicenses();
                                 renderLicenses();
                                 updateStats();
@@ -1894,9 +1936,9 @@ public class LicenseInterceptor implements HandlerInterceptor {
                                 lastGitHubRefresh = Date.now();
                                 console.log(`[SYNC] UI refreshed from GitHub after sync (attempt ${attempt})`);
                                 
-                                // Nếu đây là attempt đầu tiên và dữ liệu có thể chưa cập nhật, retry thêm 1 lần nữa sau 2 giây
+                                // Nếu đây là attempt đầu tiên và dữ liệu có thể chưa cập nhật, retry thêm 1 lần nữa sau 3 giây
                                 if (attempt === 1 && maxAttempts > 1) {
-                                    setTimeout(() => reloadWithRetry(2, maxAttempts), 2000);
+                                    setTimeout(() => reloadWithRetry(2, maxAttempts), 3000);
                                 }
                             } catch (e) {
                                 console.error(`[SYNC] Error reloading from GitHub (attempt ${attempt}):`, e);
@@ -1932,65 +1974,106 @@ public class LicenseInterceptor implements HandlerInterceptor {
         // Hàm lưu và sync licenses
         // QUAN TRỌNG: Hàm này được gọi sau MỌI thay đổi license (thêm, sửa, xóa)
         // Đảm bảo dữ liệu luôn được sync lên server (Vercel KV hoặc file JSON)
-        function saveLicenses() {
+        // ƯU TIÊN SERVER - Không cache localStorage, luôn reload từ server sau khi sync
+        async function saveLicenses() {
             try {
-                // Bước 1: Lưu vào localStorage trước (để UI hoạt động offline)
                 const licensesJson = JSON.stringify(licenses);
                 
-                try {
-                    localStorage.setItem(STORAGE_KEY, licensesJson);
-                    lastLicensesSnapshot = licensesJson; // Cập nhật snapshot ngay lập tức
-                    console.log('[SAVE] Đã lưu vào localStorage. Số lượng licenses:', licenses.length);
-                } catch (storageError) {
-                    // Xử lý lỗi localStorage quota exceeded
-                    if (storageError.name === 'QuotaExceededError' || storageError.code === 22) {
-                        console.error('[SAVE] LocalStorage quota exceeded:', storageError);
-                        showToast('⚠️ Dữ liệu quá lớn, không thể lưu vào localStorage. Đang sync trực tiếp lên server...', 'warning', 8000);
-                        // Vẫn tiếp tục sync lên server dù localStorage fail
-                    } else {
-                        throw storageError;
-                    }
-                }
-                
-                // Bước 2: BẮT BUỘC sync lên server để tự động commit lên GitHub
+                // BƯỚC 1: Sync lên server TRƯỚC (ưu tiên server, không cache)
                 // Mọi thay đổi license (thêm, sửa, xóa) đều phải sync để tự động commit lên GitHub
-                syncLicensesToServer().catch((error) => {
+                try {
+                    await syncLicensesToServer();
+                    console.log('[SAVE] ✅ Sync to server successful, will reload from server');
+                    
+                    // Sau khi sync thành công, KHÔNG lưu vào localStorage ngay
+                    // Đợi reload từ server để đảm bảo dữ liệu đồng bộ
+                    // localStorage sẽ được cập nhật sau khi reload từ server trong loadLicenses()
+                    
+                    // Force reload từ server ngay sau khi sync (không đợi interval)
+                    lastGitHubRefresh = 0; // Force reload
+                    lastServerDataHash = null; // Reset hash để force reload
+                    await loadLicenses();
+                    renderLicenses();
+                    updateStats();
+                    lastLicensesSnapshot = JSON.stringify(licenses);
+                    
+                } catch (error) {
                     console.error('[SAVE] Lỗi khi sync lên server:', error);
                     showToast('❌ Sync tự động thất bại. Vui lòng kiểm tra cấu hình GITHUB_TOKEN trong Vercel hoặc xem console để biết chi tiết.', 'error', 8000);
-                });
+                    
+                    // Chỉ lưu vào localStorage nếu sync thất bại (fallback)
+                    try {
+                        localStorage.setItem(STORAGE_KEY, licensesJson);
+                        lastLicensesSnapshot = licensesJson;
+                        console.log('[SAVE] ⚠️ Sync failed, saved to localStorage as fallback');
+                    } catch (storageError) {
+                        if (storageError.name === 'QuotaExceededError' || storageError.code === 22) {
+                            console.error('[SAVE] LocalStorage quota exceeded:', storageError);
+                            showToast('⚠️ Dữ liệu quá lớn và sync thất bại. Vui lòng thử lại.', 'warning', 8000);
+                        } else {
+                            throw storageError;
+                        }
+                    }
+                }
             } catch (e) {
-                console.error('Error saving licenses to localStorage:', e);
+                console.error('Error saving licenses:', e);
                 showModalAlert('Không thể lưu dữ liệu. Vui lòng kiểm tra cài đặt trình duyệt.', 'Lỗi', 'error');
             }
         }
 
-        // Tải dữ liệu từ server (GitHub) hoặc localStorage
+        // Tải dữ liệu từ server (API endpoint) hoặc localStorage
         async function loadLicenses() {
-            // Ưu tiên load từ GitHub raw URL để đồng bộ giữa các thiết bị
+            // ⚠️ QUAN TRỌNG: Luôn dùng API endpoint /api/licenses, KHÔNG dùng GitHub raw URL trực tiếp
+            // Ưu tiên load từ API endpoint (proxy) để tránh CORS và đồng bộ giữa các thiết bị
             let serverLicenses = [];
             try {
-                // Thêm cache-busting parameter để tránh cache CDN
-                // Sử dụng timestamp + random để đảm bảo không cache trên mobile
+                // Cache-busting cực mạnh để ĐẢM BẢO KHÔNG CACHE - Luôn lấy dữ liệu mới nhất từ server
+                // Sử dụng timestamp + performance.now() + random + Math.random() để mỗi request đều unique
                 const timestamp = Date.now();
-                const random = Math.random().toString(36).substring(7);
-                const githubRawUrl = `https://raw.githubusercontent.com/ncdathwb/ManagementLicense/main/licenses.json?t=${timestamp}&r=${random}`;
+                const performanceTime = performance.now();
+                const random1 = Math.random().toString(36).substring(7);
+                const random2 = Math.random().toString(36).substring(2, 9);
+                const userAgentHash = navigator.userAgent ? btoa(navigator.userAgent).substring(0, 8) : 'web';
+                const sessionId = sessionStorage.getItem('sessionId') || Math.random().toString(36).substring(2, 15);
+                if (!sessionStorage.getItem('sessionId')) {
+                    sessionStorage.setItem('sessionId', sessionId);
+                }
+                // Tạo cache-buster cực mạnh với nhiều tham số để đảm bảo không cache
+                const cacheBuster = `_t=${timestamp}&_p=${Math.floor(performanceTime)}&_r1=${random1}&_r2=${random2}&_u=${userAgentHash}&_s=${sessionId}&_nocache=${Date.now()}`;
+                // ⚠️ QUAN TRỌNG: Sử dụng API endpoint /api/licenses, KHÔNG dùng GitHub raw URL trực tiếp
+                // GitHub raw URL sẽ bị CORS block, phải dùng API endpoint này
+                const apiUrl = `${window.location.origin}/api/licenses?${cacheBuster}`;
+                
+                // Kiểm tra nếu URL có chứa raw.githubusercontent.com thì báo lỗi và dừng
+                if (apiUrl.includes('raw.githubusercontent.com')) {
+                    console.error('[LOAD] ❌ CRITICAL ERROR: Code đang dùng GitHub raw URL! Phải dùng /api/licenses');
+                    console.error('[LOAD] ❌ Vui lòng hard refresh (Ctrl+Shift+R) để load code mới');
+                    throw new Error('Invalid URL: Should use /api/licenses endpoint. Please hard refresh browser.');
+                }
+                
+                // Đảm bảo URL đúng format
+                if (!apiUrl.includes('/api/licenses')) {
+                    console.error('[LOAD] ❌ ERROR: URL không đúng format! Phải chứa /api/licenses');
+                    throw new Error('Invalid API URL format');
+                }
+                
+                console.log(`[LOAD] 🔄 Loading from API endpoint (NO CACHE): ${apiUrl.substring(0, 100)}...`);
                 
                 // Thêm timeout để tránh treo quá lâu
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 giây timeout
                 
                 try {
-                    const response = await fetch(githubRawUrl, {
+                    // Sử dụng API endpoint - không có CORS issue
+                    // Force no-cache với nhiều headers và options
+                    const response = await fetch(apiUrl, {
                         method: 'GET',
                         cache: 'no-store', // Không cache
                         signal: controller.signal,
-                        headers: { 
-                            'Accept': 'application/json',
-                            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
                             'Pragma': 'no-cache',
-                            'Expires': '0',
-                            'If-None-Match': '*', // Force revalidation
-                            'If-Modified-Since': '0' // Force revalidation
+                            'Expires': '0'
                         }
                     });
                     clearTimeout(timeoutId);
@@ -1999,87 +2082,113 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         try {
                             const json = await response.json();
                             if (Array.isArray(json)) {
+                                // Tính hash của dữ liệu để phát hiện thay đổi
+                                const dataString = JSON.stringify(json);
+                                const dataHash = btoa(dataString).substring(0, 32); // Hash ngắn để so sánh
+                                
+                                // Chỉ log khi có thay đổi thực sự
+                                if (lastServerDataHash !== null && lastServerDataHash !== dataHash) {
+                                    console.log('[LOAD] ⚡ Data changed on server! Old hash:', lastServerDataHash.substring(0, 8), 'New hash:', dataHash.substring(0, 8));
+                                }
+                                
                                 serverLicenses = json;
-                                console.log('[LOAD] Loaded licenses from GitHub:', serverLicenses.length);
+                                lastServerDataHash = dataHash;
+                                console.log('[LOAD] Loaded licenses from API:', serverLicenses.length);
                             } else {
-                                console.warn('[LOAD] GitHub response is not an array:', typeof json);
+                                console.warn('[LOAD] API response is not an array:', typeof json);
                             }
                         } catch (parseError) {
-                            console.error('[LOAD] Error parsing JSON from GitHub:', parseError);
+                            console.error('[LOAD] Error parsing JSON from API:', parseError);
                             // Tiếp tục với dữ liệu rỗng, sẽ dùng localStorage
                         }
                     } else if (response.status === 429) {
-                        // GitHub API rate limit exceeded
-                        console.warn('[LOAD] GitHub API rate limit exceeded (429)');
+                        // Rate limit exceeded
+                        console.warn('[LOAD] API rate limit exceeded (429)');
                         const retryAfter = response.headers.get('Retry-After');
                         if (retryAfter) {
                             console.warn(`[LOAD] Retry after ${retryAfter} seconds`);
                         }
                         // Tiếp tục với localStorage, không báo lỗi vì có thể retry sau
                     } else {
-                        console.warn(`[LOAD] GitHub response status: ${response.status}`);
+                        console.warn(`[LOAD] API response status: ${response.status}`);
                     }
                 } catch (fetchError) {
                     clearTimeout(timeoutId);
                     if (fetchError.name === 'AbortError') {
-                        console.warn('[LOAD] GitHub fetch timeout after 10 seconds');
+                        console.warn('[LOAD] API fetch timeout after 10 seconds');
                     } else {
                         throw fetchError;
                     }
                 }
             } catch (e) {
-                console.log('[LOAD] Could not load from GitHub, will try localStorage:', e.message);
-            }
-
-            // Load localStorage (để merge nếu có dữ liệu chưa sync)
-            let localLicenses = [];
-            try {
-                const data = localStorage.getItem(STORAGE_KEY);
-                if (data) {
-                    const parsed = JSON.parse(data);
-                    if (Array.isArray(parsed)) {
-                        localLicenses = parsed;
-                    }
+                // Kiểm tra nếu lỗi do dùng GitHub raw URL (code cũ)
+                if (e.message && (e.message.includes('raw.githubusercontent.com') || e.message.includes('Invalid URL'))) {
+                    console.error('[LOAD] ❌ CRITICAL: Code cũ đang chạy! Vui lòng hard refresh (Ctrl+Shift+R)');
+                    console.error('[LOAD] ❌ Browser đang cache file cũ. Hãy xóa cache và reload.');
+                    showToast('⚠️ Code cũ đang chạy! Vui lòng hard refresh (Ctrl+Shift+R)', 'warning', 5000);
+                } else {
+                    console.log('[LOAD] Could not load from API, will try localStorage:', e.message);
                 }
-            } catch (e) {
-                console.warn('[LOAD] Error reading localStorage:', e);
             }
 
-            // Merge: So sánh timestamp để ưu tiên version mới hơn, không chỉ ưu tiên server
-            // Điều này đảm bảo dữ liệu mới nhất từ cả server và local đều được giữ lại
-            const map = new Map();
-            
-            // Thêm tất cả licenses vào map, so sánh timestamp nếu trùng key
-            // Normalize key để tránh duplicate do case sensitivity
-            [...serverLicenses, ...localLicenses].forEach(item => {
-                if (item && item.key) {
-                    // Normalize key: trim và uppercase để đảm bảo so sánh chính xác
-                    const normalizedKey = String(item.key).trim().toUpperCase();
-                    const existing = map.get(normalizedKey);
-                    
-                    if (!existing) {
-                        // Key chưa có, thêm vào (đảm bảo key được normalize)
-                        map.set(normalizedKey, { ...item, key: normalizedKey });
-                    } else {
-                        // Key đã có, so sánh timestamp để giữ version mới hơn
-                        const existingUpdated = existing.updated ? new Date(existing.updated).getTime() : 0;
-                        const itemUpdated = item.updated ? new Date(item.updated).getTime() : 0;
-                        
-                        // Nếu item mới hơn (updated timestamp lớn hơn), thay thế
-                        if (itemUpdated > existingUpdated) {
-                            map.set(normalizedKey, { ...item, key: normalizedKey });
-                            console.log(`[LOAD] Merged: Keeping newer version of key ${normalizedKey} (${item.updated} vs ${existing.updated})`);
+            // ƯU TIÊN HOÀN TOÀN SERVER DATA - Không merge với localStorage để đảm bảo đồng bộ
+            // Chỉ dùng localStorage khi server không có data hoặc lỗi
+            if (serverLicenses.length > 0) {
+                // Server có data -> Dùng server data hoàn toàn, bỏ qua localStorage
+                licenses = serverLicenses.map(item => {
+                    if (item && item.key) {
+                        const normalizedKey = String(item.key).trim().toUpperCase();
+                        return { ...item, key: normalizedKey };
+                    }
+                    return item;
+                }).filter(item => item && item.key);
+                
+                console.log(`[LOAD] ✅ Using SERVER data only: ${licenses.length} licenses (ignoring localStorage for sync)`);
+                
+                // Cập nhật localStorage để đồng bộ với server (nhưng không dùng để merge)
+                try {
+                    const serverDataJson = JSON.stringify(licenses);
+                    localStorage.setItem(STORAGE_KEY, serverDataJson);
+                    console.log('[LOAD] Updated localStorage to match server data');
+                } catch (e) {
+                    console.warn('[LOAD] Could not update localStorage:', e);
+                }
+            } else {
+                // Server không có data -> Fallback về localStorage (chỉ khi offline hoặc server lỗi)
+                let localLicenses = [];
+                try {
+                    const data = localStorage.getItem(STORAGE_KEY);
+                    if (data) {
+                        const parsed = JSON.parse(data);
+                        if (Array.isArray(parsed)) {
+                            localLicenses = parsed;
                         }
                     }
+                } catch (e) {
+                    console.warn('[LOAD] Error reading localStorage:', e);
                 }
-            });
-
-            licenses = Array.from(map.values());
+                
+                licenses = localLicenses.map(item => {
+                    if (item && item.key) {
+                        const normalizedKey = String(item.key).trim().toUpperCase();
+                        return { ...item, key: normalizedKey };
+                    }
+                    return item;
+                }).filter(item => item && item.key);
+                
+                console.log(`[LOAD] ⚠️ Server empty, using localStorage fallback: ${licenses.length} licenses`);
+            }
+            
+            console.log(`[LOAD] Final licenses count: ${licenses.length}`);
 
             // Lưu snapshot vào localStorage để cache
+            // QUAN TRỌNG: Ghi đè dữ liệu cũ trong localStorage bằng dữ liệu từ server
+            // Điều này đảm bảo localStorage luôn đồng bộ với server
             try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
-                lastLicensesSnapshot = JSON.stringify(licenses);
+                const licensesJson = JSON.stringify(licenses);
+                localStorage.setItem(STORAGE_KEY, licensesJson);
+                lastLicensesSnapshot = licensesJson;
+                console.log(`[LOAD] Saved ${licenses.length} licenses to localStorage (overwritten old data)`);
             } catch (e) {
                 // Xử lý lỗi localStorage quota
                 if (e.name === 'QuotaExceededError' || e.code === 22) {
@@ -2096,8 +2205,9 @@ public class LicenseInterceptor implements HandlerInterceptor {
         // Tự động refresh UI khi localStorage thay đổi (cùng tab hoặc tab khác)
         // Cũng reload từ GitHub định kỳ để đồng bộ giữa các thiết bị
         let lastGitHubRefresh = 0;
-        const GITHUB_REFRESH_INTERVAL = 2000; // Refresh từ GitHub mỗi 2 giây để đồng bộ realtime
+        const GITHUB_REFRESH_INTERVAL = 1000; // Refresh từ GitHub mỗi 1 giây để đồng bộ realtime nhanh hơn
         let isLoadingFromGitHub = false; // Flag để tránh multiple concurrent reloads
+        let lastServerDataHash = null; // Hash của dữ liệu server để phát hiện thay đổi
         
         async function refreshLicensesIfChanged() {
             try {
@@ -2126,21 +2236,43 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     lastGitHubRefresh = now;
                     isLoadingFromGitHub = true;
                     try {
+                        // Lưu hash và snapshot trước khi load để so sánh
+                        const previousHash = lastServerDataHash;
+                        const previousSnapshot = lastLicensesSnapshot;
+                        
+                        // Reset hash để force reload từ server (không cache)
+                        lastServerDataHash = null;
+                        
+                        // Load từ server (luôn mới, không cache)
                         await loadLicenses();
-                        // Luôn render để đảm bảo UI cập nhật (không chỉ khi thay đổi)
-                        // Vì có thể số lượng giống nhưng dữ liệu bên trong đã thay đổi
+                        
+                        // Luôn render để đảm bảo UI cập nhật với dữ liệu mới nhất từ server
                         const newData = JSON.stringify(licenses);
-                        if (newData !== lastLicensesSnapshot) {
+                        const dataChanged = newData !== previousSnapshot;
+                        const serverDataChanged = previousHash !== null && lastServerDataHash !== null && previousHash !== lastServerDataHash;
+                        
+                        // Luôn render nếu có thay đổi hoặc đây là lần đầu load
+                        if (dataChanged || serverDataChanged || previousSnapshot === null) {
                             lastLicensesSnapshot = newData;
                             renderLicenses();
                             updateStats();
-                            console.log('[REFRESH] UI updated from GitHub');
+                            
+                            if (serverDataChanged) {
+                                console.log('[REFRESH] ⚡⚡⚡ Server data changed! UI updated from server');
+                                // Hiển thị thông báo khi có thay đổi từ thiết bị khác
+                                showToast('🔄 Đã cập nhật dữ liệu mới từ server', 'info', 2000);
+                            } else if (dataChanged) {
+                                console.log('[REFRESH] UI updated from server (data changed)');
+                            } else {
+                                console.log('[REFRESH] UI updated from server (initial load)');
+                            }
                         } else {
                             // Vẫn update stats để đảm bảo số lượng hiển thị đúng
                             updateStats();
+                            console.log('[REFRESH] No changes detected, stats updated');
                         }
                     } catch (e) {
-                        console.log('[REFRESH] Could not refresh from GitHub:', e.message);
+                        console.log('[REFRESH] Could not refresh from server:', e.message);
                     } finally {
                         isLoadingFromGitHub = false;
                     }
