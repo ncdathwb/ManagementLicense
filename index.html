@@ -1726,7 +1726,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 
                 // Lắng nghe thay đổi localStorage từ tab khác
                 window.addEventListener('storage', refreshLicensesIfChanged);
-                // Interval nhỏ để phát hiện thay đổi localStorage trong cùng tab (nếu có sync nền)
+                // Interval để phát hiện thay đổi localStorage trong cùng tab và reload từ GitHub
                 setInterval(refreshLicensesIfChanged, 5000);
                 
                 // Xử lý verify từ URL (chỉ hiển thị UI, không trả JSON)
@@ -1837,6 +1837,19 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     if (!syncedToKV && !committedToGit) {
                         // Không lưu được lên server/GitHub -> cảnh báo để biết dữ liệu chỉ ở local
                         showToast('⚠️ Sync chưa lưu lên server. Dữ liệu chỉ tồn tại trên thiết bị này. Vui lòng kiểm tra cấu hình GITHUB_TOKEN/Vercel KV.', 'warning', 8000);
+                    } else if (committedToGit) {
+                        // Nếu commit thành công lên GitHub, đợi một chút rồi reload từ GitHub để cập nhật UI
+                        console.log('[SYNC] GitHub commit successful, will reload from GitHub in 2 seconds...');
+                        setTimeout(async () => {
+                            try {
+                                await loadLicenses();
+                                renderLicenses();
+                                updateStats();
+                                console.log('[SYNC] UI refreshed from GitHub after sync');
+                            } catch (e) {
+                                console.error('[SYNC] Error reloading from GitHub after sync:', e);
+                            }
+                        }, 2000); // Đợi 2 giây để GitHub CDN cập nhật
                     }
                     console.log('[SYNC] Sync success:', result);
                 } else {
@@ -1859,7 +1872,9 @@ public class LicenseInterceptor implements HandlerInterceptor {
         function saveLicenses() {
             try {
                 // Bước 1: Lưu vào localStorage trước (để UI hoạt động offline)
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses));
+                const licensesJson = JSON.stringify(licenses);
+                localStorage.setItem(STORAGE_KEY, licensesJson);
+                lastLicensesSnapshot = licensesJson; // Cập nhật snapshot ngay lập tức
                 console.log('[SAVE] Đã lưu vào localStorage. Số lượng licenses:', licenses.length);
                 
                 // Bước 2: BẮT BUỘC sync lên server để tự động commit lên GitHub
@@ -1879,11 +1894,17 @@ public class LicenseInterceptor implements HandlerInterceptor {
             // Ưu tiên load từ GitHub raw URL để đồng bộ giữa các thiết bị
             let serverLicenses = [];
             try {
-                const githubRawUrl = 'https://raw.githubusercontent.com/ncdathwb/ManagementLicense/main/licenses.json';
+                // Thêm cache-busting parameter để tránh cache CDN
+                const timestamp = Date.now();
+                const githubRawUrl = `https://raw.githubusercontent.com/ncdathwb/ManagementLicense/main/licenses.json?t=${timestamp}`;
                 const response = await fetch(githubRawUrl, {
                     method: 'GET',
-                    cache: 'no-cache',
-                    headers: { 'Accept': 'application/json' }
+                    cache: 'no-store', // Không cache
+                    headers: { 
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    }
                 });
                 if (response.ok) {
                     const json = await response.json();
@@ -1935,23 +1956,47 @@ public class LicenseInterceptor implements HandlerInterceptor {
         }
 
         // Tự động refresh UI khi localStorage thay đổi (cùng tab hoặc tab khác)
-        function refreshLicensesIfChanged() {
+        // Cũng reload từ GitHub định kỳ để đồng bộ giữa các thiết bị
+        let lastGitHubRefresh = 0;
+        const GITHUB_REFRESH_INTERVAL = 10000; // Refresh từ GitHub mỗi 10 giây
+        
+        async function refreshLicensesIfChanged() {
             try {
                 const data = localStorage.getItem(STORAGE_KEY);
-                // Nếu dữ liệu không thay đổi, bỏ qua
-                if (data === lastLicensesSnapshot) return;
-
-                if (data) {
-                    const parsed = JSON.parse(data);
-                    if (Array.isArray(parsed)) {
-                        licenses = parsed;
-                        lastLicensesSnapshot = data;
-                        renderLicenses();
-                        updateStats();
+                // Kiểm tra localStorage thay đổi
+                if (data !== lastLicensesSnapshot) {
+                    if (data) {
+                        const parsed = JSON.parse(data);
+                        if (Array.isArray(parsed)) {
+                            licenses = parsed;
+                            lastLicensesSnapshot = data;
+                            renderLicenses();
+                            updateStats();
+                            console.log('[REFRESH] UI updated from localStorage');
+                        }
+                    }
+                }
+                
+                // Định kỳ reload từ GitHub để đồng bộ giữa các thiết bị
+                const now = Date.now();
+                if (now - lastGitHubRefresh >= GITHUB_REFRESH_INTERVAL) {
+                    lastGitHubRefresh = now;
+                    try {
+                        await loadLicenses();
+                        // Chỉ render nếu dữ liệu thực sự thay đổi
+                        const newData = JSON.stringify(licenses);
+                        if (newData !== lastLicensesSnapshot) {
+                            lastLicensesSnapshot = newData;
+                            renderLicenses();
+                            updateStats();
+                            console.log('[REFRESH] UI updated from GitHub');
+                        }
+                    } catch (e) {
+                        console.log('[REFRESH] Could not refresh from GitHub:', e.message);
                     }
                 }
             } catch (e) {
-                console.error('Error refreshing licenses from localStorage:', e);
+                console.error('Error refreshing licenses:', e);
             }
         }
 
