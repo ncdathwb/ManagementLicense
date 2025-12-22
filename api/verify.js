@@ -1,5 +1,3 @@
-// Vercel Serverless Function để verify license và trả về JSON
-// Static fallback to ensure license list luôn có sẵn (dù KV hay fs lỗi)
 let staticFallbackLicenses = [];
 try {
   staticFallbackLicenses = require('../licenses.json');
@@ -8,7 +6,6 @@ try {
 }
 
 export default async function handler(req, res) {
-  // Chỉ cho phép GET request
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -24,13 +21,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Đọc licenses: kết hợp KV, file, và static fallback để tránh mất key khi KV chưa sync
     let licensesFromKv = [];
     let licensesFromFile = [];
     let licensesFromGitHub = [];
     const licensesFromStatic = Array.isArray(staticFallbackLicenses) ? staticFallbackLicenses : [];
 
-    // 1) Đọc từ Vercel KV (nếu có)
     try {
       const { kv } = require('@vercel/kv');
       if (kv) {
@@ -44,7 +39,6 @@ export default async function handler(req, res) {
       console.log('[VERIFY] Vercel KV not available, will still read file:', e.message);
     }
 
-    // 2) Đọc từ file JSON trong repo (để đảm bảo luôn có key gốc)
     try {
       const fs = require('fs');
       const path = require('path');
@@ -62,15 +56,12 @@ export default async function handler(req, res) {
       console.error('[VERIFY] Error reading licenses.json:', fileError);
     }
 
-    // 3) Đọc từ GitHub raw (public) để lấy bản mới nhất nếu KV chưa có hoặc sync GitHub thất bại
     try {
-      // Sử dụng global fetch (có sẵn trong Node 18+ và Vercel)
       const owner = process.env.GITHUB_REPO_OWNER || 'ncdathwb';
       const repo = process.env.GITHUB_REPO_NAME || 'ManagementLicense';
       const branch = process.env.GITHUB_REPO_BRANCH || 'main';
       const githubUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/licenses.json`;
       
-      // Thêm timeout với AbortController
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 7000);
       
@@ -93,12 +84,9 @@ export default async function handler(req, res) {
             }
           } catch (parseError) {
             console.error('[VERIFY] Error parsing JSON from GitHub:', parseError.message);
-            // Tiếp tục với dữ liệu rỗng, sẽ dùng nguồn khác
           }
         } else if (ghResp.status === 429) {
-          // GitHub API rate limit exceeded
           console.warn('[VERIFY] GitHub API rate limit exceeded (429)');
-          // Tiếp tục với dữ liệu từ nguồn khác
         } else {
           console.log('[VERIFY] GitHub raw fetch status:', ghResp.status);
         }
@@ -114,25 +102,19 @@ export default async function handler(req, res) {
       console.log('[VERIFY] Cannot load licenses from GitHub raw:', e.message);
     }
 
-    // 3) Gộp: So sánh timestamp để ưu tiên version mới hơn (giống logic trong index.html)
-    // Đảm bảo dữ liệu mới nhất từ mọi nguồn đều được giữ lại
     const licenseMap = new Map();
     
-    // Thêm tất cả licenses vào map, so sánh timestamp nếu trùng key
     [...licensesFromStatic, ...licensesFromFile, ...licensesFromGitHub, ...licensesFromKv].forEach(lic => {
       if (lic && lic.key) {
         const key = String(lic.key).trim().toUpperCase();
         const existing = licenseMap.get(key);
         
         if (!existing) {
-          // Key chưa có, thêm vào
           licenseMap.set(key, lic);
         } else {
-          // Key đã có, so sánh timestamp để giữ version mới hơn
           const existingUpdated = existing.updated ? new Date(existing.updated).getTime() : 0;
           const licUpdated = lic.updated ? new Date(lic.updated).getTime() : 0;
           
-          // Nếu license mới hơn (updated timestamp lớn hơn), thay thế
           if (licUpdated > existingUpdated) {
             licenseMap.set(key, lic);
             console.log(`[VERIFY] Merged: Keeping newer version of key ${key} (${lic.updated} vs ${existing.updated})`);
@@ -143,7 +125,6 @@ export default async function handler(req, res) {
     
     const licenses = Array.from(licenseMap.values());
 
-    // Tìm license
     const license = licenses.find(
       (l) => (l.key || '').toString().trim().toUpperCase() === normalizedKey
     );
@@ -160,13 +141,11 @@ export default async function handler(req, res) {
       });
     }
 
-    // Tính toán trạng thái
     const expiry = new Date(license.expiry);
     const diffTime = expiry - now;
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     let status, valid;
-    // Hết hạn khi đã qua thời điểm hết hạn (diffTime <= 0)
     if (diffTime <= 0) {
       status = 'expired';
       valid = false;
@@ -178,8 +157,6 @@ export default async function handler(req, res) {
       valid = true;
     }
 
-    // Chuẩn hóa status cho app.py
-    // app.py kiểm tra: status in ("active", "đang hoạt động", "") thì hợp lệ
     const apiStatus = valid && status !== 'expired' ? 'active' : status;
 
     const result = {
@@ -197,7 +174,6 @@ export default async function handler(req, res) {
       timestamp: now.toISOString()
     };
 
-    // Set Content-Type header
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(result);
   } catch (error) {
@@ -209,4 +185,3 @@ export default async function handler(req, res) {
     });
   }
 }
-

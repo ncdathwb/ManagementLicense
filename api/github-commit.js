@@ -1,6 +1,4 @@
-// Vercel Serverless Function để tự động commit licenses.json lên GitHub
 export default async function handler(req, res) {
-  // Chỉ cho phép POST request
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -14,7 +12,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Lấy GitHub token từ environment variable
     const githubToken = process.env.GITHUB_TOKEN;
     if (!githubToken) {
       console.error('GITHUB_TOKEN not configured');
@@ -24,13 +21,11 @@ export default async function handler(req, res) {
       });
     }
 
-    // GitHub repository info (có thể lấy từ env hoặc hardcode)
     const repoOwner = process.env.GITHUB_REPO_OWNER || 'ncdathwb';
     const repoName = process.env.GITHUB_REPO_NAME || 'ManagementLicense';
     const filePath = 'licenses.json';
     const branch = 'main';
 
-    // 1. Lấy SHA của file hiện tại (nếu có)
     let currentSha = null;
     try {
       const getFileUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}?ref=${branch}`;
@@ -50,11 +45,9 @@ export default async function handler(req, res) {
       console.log('File does not exist or error getting file:', e.message);
     }
 
-    // 2. Tạo nội dung file mới (base64 encoded)
     const fileContent = JSON.stringify(licenses, null, 2);
     const encodedContent = Buffer.from(fileContent).toString('base64');
 
-    // 3. Commit file lên GitHub
     const commitMessage = message || `Auto-update licenses.json - ${new Date().toISOString()}`;
     
     const commitUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`;
@@ -64,7 +57,6 @@ export default async function handler(req, res) {
       branch: branch
     };
 
-    // Nếu file đã tồn tại, cần thêm SHA để update
     if (currentSha) {
       commitBody.sha = currentSha;
     }
@@ -110,4 +102,3 @@ export default async function handler(req, res) {
     });
   }
 }
-

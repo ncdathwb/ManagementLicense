@@ -3,14 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Force no-cache để đảm bảo luôn load file mới nhất -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>License Manager với Verify Online</title>
-    <!-- JSON API Response cho ?verify= -->
     <script>
-        // Output JSON ngay đầu file nếu có ?verify= (cho Python requests)
         (function() {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -20,7 +17,6 @@
                 const hasOtherParams = Array.from(urlParams.keys()).some(k => k !== 'verify' && k !== 'format');
                 
                 if (verifyKey && (format === 'json' || (!hasHash && !hasOtherParams))) {
-                    // Load licenses từ localStorage
                     let licenses = [];
                     try {
                         const data = localStorage.getItem('licenses');
@@ -36,10 +32,8 @@
                     } else {
                         const expiry = new Date(license.expiry);
                         const diffTime = expiry - now;
-                        // Dùng Math.floor để tính chính xác số ngày (có thể âm nếu đã hết hạn)
                         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                         let status, valid;
-                        // Hết hạn khi đã qua thời điểm expiry
                         if (diffTime <= 0) { status = 'expired'; valid = false; }
                         else if (diffDays <= 7) { status = 'expiring'; valid = true; }
                         else { status = 'valid'; valid = true; }
@@ -54,7 +48,6 @@
                             timestamp: now.toISOString()
                         };
                     }
-                    // Output JSON vào document ngay lập tức
                     document.open('text/plain');
                     document.write(JSON.stringify(result));
                     document.close();
@@ -63,7 +56,6 @@
             } catch(e) {}
         })();
     </script>
-    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
     <style>
@@ -83,7 +75,6 @@
             z-index: 1;
         }
         
-        /* Đảm bảo tất cả input và button có thể click được */
         input, button, select, textarea, .form-control, .btn {
             pointer-events: auto !important;
             cursor: pointer !important;
@@ -100,7 +91,6 @@
             cursor: text !important;
         }
         
-        /* Đảm bảo tab content có thể tương tác */
         .tab-content {
             position: relative;
             z-index: 1;
@@ -111,7 +101,6 @@
             z-index: 1;
         }
         
-        /* Đảm bảo input group có thể click */
         .input-group {
             position: relative;
             z-index: 10;
@@ -123,7 +112,7 @@
             z-index: 11;
         }
         
-        /* Modal center fix */
+        
         .modal {
             display: flex !important;
             align-items: center;
@@ -143,17 +132,15 @@
             z-index: 1040;
         }
         
-        /* Đảm bảo modal không block interactions khi đóng */
+        
         .modal:not(.show) {
             display: none !important;
         }
         
-        /* Đảm bảo body không bị block khi không có modal */
         body:not(.modal-open) {
             overflow: auto !important;
         }
         
-        /* Ensure modal is centered vertically */
         .modal.fade .modal-dialog {
             transition: transform 0.3s ease-out;
             transform: translate(0, -50px);
@@ -162,7 +149,6 @@
             transform: translate(0, 0);
         }
         
-        /* Responsive for mobile */
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -233,10 +219,6 @@
             .license-card .col-md-2 {
                 margin-bottom: 15px;
             }
-            .count-badge {
-                font-size: 0.7rem;
-                padding: 2px 6px;
-            }
             .status-badge {
                 font-size: 0.7rem;
                 padding: 4px 10px;
@@ -281,7 +263,6 @@
             cursor: pointer !important;
         }
         
-        /* Đảm bảo không có element nào che phủ */
         .license-card * {
             pointer-events: auto;
         }
@@ -323,7 +304,6 @@
             color: #155724;
         }
         
-        /* Checkbox styling */
         .license-checkbox {
             width: 20px;
             height: 20px;
@@ -365,13 +345,6 @@
         .highlight { background-color: #fffacd; padding: 2px 5px; border-radius: 3px; }
         .copy-btn { cursor: pointer; transition: all 0.3s; }
         .copy-btn:hover { transform: scale(1.1); }
-        .count-badge { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-            color: white;
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 0.8em;
-        }
         .empty-state { 
             text-align: center; 
             padding: 50px 20px; 
@@ -391,7 +364,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
+        
         <div class="header">
             <div class="row align-items-center">
                 <div class="col-md-8">
@@ -402,7 +375,6 @@
                 </div>
                 <div class="col-md-4 text-end">
                     <div class="d-flex justify-content-end align-items-center gap-2">
-                        <span id="totalLicenses" class="count-badge">0 license</span>
                         <button class="btn btn-success" onclick="showAddModal()">
                             <i class="bi bi-plus-lg"></i> Thêm License
                         </button>
@@ -411,7 +383,7 @@
             </div>
         </div>
 
-        <!-- Tabs -->
+        
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="manage-tab" data-bs-toggle="tab" data-bs-target="#manage" type="button">
@@ -435,9 +407,9 @@
             </li>
         </ul>
 
-        <!-- Tab Content -->
+        
         <div class="tab-content" id="myTabContent">
-            <!-- Tab 1: Quản lý License -->
+            
             <div class="tab-pane fade show active" id="manage" role="tabpanel">
                 <div class="row mb-4">
                     <div class="col-md-6">
@@ -461,7 +433,7 @@
                     </div>
                 </div>
 
-                <!-- Thống kê -->
+                
                 <div class="row mb-4">
                     <div class="col-md-4">
                         <div class="d-flex align-items-center p-3 bg-success bg-opacity-10 rounded">
@@ -492,7 +464,7 @@
                     </div>
                 </div>
 
-                <!-- Bulk Actions -->
+                
                 <div class="row mb-3" id="bulkActionsContainer" style="display: none;">
                     <div class="col-12">
                         <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border">
@@ -513,9 +485,9 @@
                     </div>
                 </div>
 
-                <!-- Danh sách License -->
+                
                 <div id="licensesContainer">
-                    <!-- License cards sẽ được thêm bằng JavaScript -->
+                    
                 </div>
 
                 <div id="emptyState" class="empty-state" style="display: none;">
@@ -527,15 +499,15 @@
                     </button>
                 </div>
 
-                <!-- Pagination -->
+                
                 <nav aria-label="License pagination" id="paginationContainer" style="display: none;">
                     <ul class="pagination justify-content-center mt-4" id="paginationList">
-                        <!-- Pagination items sẽ được thêm bằng JavaScript -->
+                        
                     </ul>
                 </nav>
             </div>
 
-            <!-- Tab 2: Verify License -->
+            
             <div class="tab-pane fade" id="verify" role="tabpanel">
                 <div class="row">
                     <div class="col-md-6">
@@ -592,7 +564,7 @@
                 </div>
             </div>
 
-            <!-- Tab 3: API & Integration -->
+            
             <div class="tab-pane fade" id="api" role="tabpanel">
                 <div class="row">
                     <div class="col-md-6">
@@ -675,7 +647,7 @@ def verify_license(key):
                 </div>
             </div>
 
-            <!-- Tab 4: Hướng dẫn API -->
+            
             <div class="tab-pane fade" id="docs" role="tabpanel">
                 <div class="row">
                     <div class="col-12 mb-4">
@@ -685,7 +657,7 @@ def verify_license(key):
                 </div>
 
                 <div class="row">
-                    <!-- Python Section -->
+                    
                     <div class="col-md-6">
                         <div class="card mb-4">
                             <div class="card-header bg-primary text-white">
@@ -942,7 +914,7 @@ def protected_view(request):
                         </div>
                     </div>
 
-                    <!-- Java Section -->
+                    
                     <div class="col-md-6">
                         <div class="card mb-4">
                             <div class="card-header bg-success text-white">
@@ -1014,8 +986,7 @@ public class LicenseVerifier {
             );
         }
     }
-    
-    // Inner class để chứa kết quả
+
     public static class LicenseResult {
         private final boolean valid;
         private final String status;
@@ -1031,8 +1002,7 @@ public class LicenseVerifier {
             this.daysRemaining = daysRemaining;
             this.message = message;
         }
-        
-        // Getters
+
         public boolean isValid() { return valid; }
         public String getStatus() { return status; }
         public String getExpiry() { return expiry; }
@@ -1041,7 +1011,6 @@ public class LicenseVerifier {
     }
 }
 
-// Sử dụng
 LicenseVerifier verifier = new LicenseVerifier();
 LicenseVerifier.LicenseResult result = 
     verifier.verify("LIC-W8B61JUL-F7OD");
@@ -1122,8 +1091,7 @@ public class LicenseVerifierJava11 {
             );
         }
     }
-    
-    // LicenseResult class giống như trên
+
 }</code></pre>
 
                                 <h6 class="text-success mt-4">4. Class wrapper đầy đủ với error handling</h6>
@@ -1158,8 +1126,7 @@ public class LicenseVerifierAdvanced {
             
             CloseableHttpClient httpClient = HttpClients.createDefault();
             HttpGet request = new HttpGet(url);
-            
-            // Set timeout
+
             RequestConfig config = RequestConfig.custom()
                 .setConnectTimeout(timeoutSeconds * 1000)
                 .setSocketTimeout(timeoutSeconds * 1000)
@@ -1184,8 +1151,7 @@ public class LicenseVerifierAdvanced {
                 );
                 
                 JsonObject json = gson.fromJson(jsonResponse, JsonObject.class);
-                
-                // Validate response
+
                 if (!json.has("valid")) {
                     return new LicenseResult(
                         false, 
@@ -1281,7 +1247,6 @@ public class LicenseController {
     }
 }
 
-// Spring Boot Service
 import org.springframework.stereotype.Service;
 
 @Service
@@ -1310,14 +1275,12 @@ public class LicenseService {
     }
 }
 
-// Custom Exception
 public class LicenseException extends RuntimeException {
     public LicenseException(String message) {
         super(message);
     }
 }
 
-// Interceptor để kiểm tra license tự động
 import org.springframework.web.servlet.HandlerInterceptor;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -1350,7 +1313,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     </div>
                 </div>
 
-                <!-- Best Practices Section -->
+                
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="card">
@@ -1405,7 +1368,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
         </div>
     </div>
 
-    <!-- Modal thêm/sửa license -->
+    
     <div class="modal fade" id="licenseModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -1537,12 +1500,12 @@ public class LicenseInterceptor implements HandlerInterceptor {
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- QRCode.js với fallback -->
+    
     <script>
-        // Fallback nếu CDN không load được - Định nghĩa TRƯỚC khi sử dụng
-        // Phải định nghĩa trong window để có thể gọi từ onerror attribute
+
+
         window.loadQRCodeFallback = function() {
             console.warn('QRCode CDN failed, trying alternative...');
             if (window.QRCodeLoadFailed) {
@@ -1561,21 +1524,20 @@ public class LicenseInterceptor implements HandlerInterceptor {
             };
             document.head.appendChild(script);
         };
-        // Cũng định nghĩa global function để tương thích
+
         var loadQRCodeFallback = window.loadQRCodeFallback;
     </script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" 
             onerror="if(typeof loadQRCodeFallback !== 'undefined') loadQRCodeFallback(); else if(typeof window.loadQRCodeFallback !== 'undefined') window.loadQRCodeFallback();"></script>
     <script>
-        
-        // Kiểm tra QRCode đã load chưa sau khi page load
+
         window.addEventListener('load', function() {
             if (typeof QRCode !== 'undefined') {
                 window.QRCodeLoaded = true;
                 console.log('QRCode library loaded successfully');
             } else {
                 console.warn('QRCode library not loaded, will retry...');
-                // Retry sau 1 giây
+
                 setTimeout(function() {
                     if (typeof QRCode === 'undefined' && !window.QRCodeLoadFailed) {
                         loadQRCodeFallback();
@@ -1586,19 +1548,17 @@ public class LicenseInterceptor implements HandlerInterceptor {
     </script>
 
     <script>
-        // Biến toàn cục
+
         let licenses = [];
-        // Snapshot để phát hiện thay đổi localStorage mà không cần reload trang
+
         let lastLicensesSnapshot = null;
         let currentEditKey = null;
         const STORAGE_KEY = 'licenseManagerData';
-        
-        // Pagination
+
         let currentPage = 1;
         const itemsPerPage = 3;
         let filteredLicensesForPagination = [];
 
-        // Hàm escape HTML để tránh XSS
         function escapeHtml(text) {
             if (!text) return '';
             const div = document.createElement('div');
@@ -1606,25 +1566,22 @@ public class LicenseInterceptor implements HandlerInterceptor {
             return div.innerHTML;
         }
 
-        // Kiểm tra xem có phải API request không (từ fetch/XMLHttpRequest)
         function isApiRequest() {
-            // Kiểm tra Accept header hoặc User-Agent
+
             const acceptHeader = navigator.userAgent.includes('fetch') || 
                                 navigator.userAgent.includes('XMLHttpRequest');
-            // Hoặc kiểm tra nếu có header Accept: application/json trong request
-            // (không thể check trực tiếp từ client, nhưng có thể dựa vào context)
+
+
             return false; // Mặc định là false, sẽ được override nếu cần
         }
 
-        // Xử lý API verify request TRƯỚC khi DOM load
         (function() {
             const urlParams = new URLSearchParams(window.location.search);
             const verifyKey = urlParams.get('verify');
-            
-            // Nếu có ?verify= và request có vẻ là API call (không có hash, không có tab)
-            // Hoặc có thể check Accept header nếu có cách
+
+
             if (verifyKey) {
-                // Load licenses từ localStorage trước
+
                 try {
                     const data = localStorage.getItem(STORAGE_KEY);
                     if (data) {
@@ -1634,7 +1591,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     console.error('Error loading licenses:', e);
                 }
 
-                // Gọi API function
                 const license = licenses.find(l => l.key === verifyKey.toUpperCase());
                 const now = new Date();
                 
@@ -1651,11 +1607,11 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 } else {
                     const expiry = new Date(license.expiry);
                     const diffTime = expiry - now;
-                    // Dùng Math.floor để tính chính xác số ngày (có thể âm nếu đã hết hạn)
+
                     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                     
                     let status, valid;
-                    // Nếu days_remaining <= 0 (số âm hoặc 0) thì key hết hạn
+
                     if (diffDays <= 0 || diffTime <= 0) {
                         status = 'expired';
                         valid = false;
@@ -1681,104 +1637,91 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     };
                 }
 
-                // Kiểm tra nếu request có format=json hoặc chỉ có ?verify= (API call từ app.py)
                 const format = urlParams.get('format');
                 const hasHash = window.location.hash && window.location.hash.length > 1;
                 const hasOtherParams = Array.from(urlParams.keys()).some(k => k !== 'verify' && k !== 'format');
-                
-                // Luôn trả JSON nếu:
-                // 1. Có format=json
-                // 2. Chỉ có ?verify= và không có hash, không có params khác (API request)
+
+
+
                 const isJsonRequest = format === 'json' || 
                                      window.location.search.includes('format=json') ||
                                      (verifyKey && !hasHash && !hasOtherParams); // Chỉ có ?verify= -> API request
 
-                // Nếu là JSON request, trả về JSON ngay và dừng
                 if (isJsonRequest) {
-                    // Đảm bảo status format đúng với app.py mong đợi
-                    // app.py kiểm tra: status in ("active", "đang hoạt động", "") thì hợp lệ
-                    // Status "expired" hoặc khác sẽ bị reject
+
+
+
                     if (result.valid && result.status !== 'expired') {
-                        // License hợp lệ (kể cả sắp hết hạn) -> status = "active" để app.py chấp nhận
+
                         result.status = 'active';
                     }
-                    // Nếu expired thì giữ nguyên status = 'expired'
-                    
-                    // Trả về JSON thuần - xóa toàn bộ document và chỉ trả JSON
-                    // Đảm bảo không có HTML tags nào trong response
+
+
+
                     document.documentElement.innerHTML = '';
                     document.documentElement.textContent = JSON.stringify(result, null, 2);
-                    // Dừng mọi script khác
+
                     if (window.stop) window.stop();
                     return; // Dừng execution
                 }
-                // Nếu không phải JSON request, tiếp tục load UI bình thường
+
             }
         })();
 
-        // Khởi tạo khi trang được tải (chỉ chạy nếu không phải API request)
         document.addEventListener('DOMContentLoaded', function() {
-            // Kiểm tra xem đã trả về JSON chưa (nếu có thì không chạy tiếp)
+
             if (document.body.innerHTML.trim() === '' || document.body.innerHTML.match(/^\s*\{/)) {
                 return;
             }
 
             try {
-                // Load licenses từ server trước (async)
+
                 loadLicenses().then(() => {
                     renderLicenses();
                     updateStats();
                     updateLiveEndpoint();
                 }).catch((e) => {
                     console.error('[INIT] Error loading licenses:', e);
-                    // Vẫn render với dữ liệu rỗng nếu load thất bại
+
                     renderLicenses();
                     updateStats();
                     updateLiveEndpoint();
                 });
-                
-                // Lắng nghe thay đổi localStorage từ tab khác
+
                 window.addEventListener('storage', refreshLicensesIfChanged);
-                
-                // Interval để phát hiện thay đổi localStorage trong cùng tab và reload từ GitHub
-                // Lưu interval ID để có thể cleanup khi cần
-                // Giảm xuống 1 giây để đồng bộ realtime nhanh hơn giữa các thiết bị
+
+
+
                 const refreshIntervalId = setInterval(refreshLicensesIfChanged, 1000);
-                
-                // Reload ngay khi tab/window trở nên visible (user quay lại tab)
+
                 document.addEventListener('visibilitychange', function() {
                     if (!document.hidden) {
                         console.log('[VISIBILITY] Tab became visible, reloading from GitHub...');
-                        // Reset lastGitHubRefresh để force reload ngay
+
                         lastGitHubRefresh = 0;
                         refreshLicensesIfChanged();
                     }
                 });
-                
-                // Reload ngay khi window focus (user quay lại window)
+
                 window.addEventListener('focus', function() {
                     console.log('[FOCUS] Window focused, reloading from GitHub...');
-                    // Reset lastGitHubRefresh để force reload ngay
+
                     lastGitHubRefresh = 0;
                     refreshLicensesIfChanged();
                 });
-                
-                // Cleanup interval khi page unload
+
                 window.addEventListener('beforeunload', function() {
                     if (refreshIntervalId) {
                         clearInterval(refreshIntervalId);
                     }
                 });
-                
-                // Xử lý verify từ URL (chỉ hiển thị UI, không trả JSON)
+
                 handleUrlVerification();
-                
-                // Cleanup countdowns khi page unload
+
                 window.addEventListener('beforeunload', function() {
                     stopAllCountdowns();
                 });
-                
-                // Thêm event listeners với error handling
+
                 const expiryDateEl = document.getElementById('expiryDate');
                 const licenseKeyEl = document.getElementById('licenseKey');
                 
@@ -1789,7 +1732,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     licenseKeyEl.addEventListener('input', updatePreview);
                 }
 
-                // Thêm event listener cho search input
                 const searchInput = document.getElementById('searchInput');
                 if (searchInput) {
                     searchInput.addEventListener('input', filterLicenses);
@@ -1805,23 +1747,20 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         });
 
-        // Xử lý verify từ URL parameters (chỉ cho UI)
         function handleUrlVerification() {
             const urlParams = new URLSearchParams(window.location.search);
             const verifyKey = urlParams.get('verify');
             const format = urlParams.get('format');
-            
-            // Chỉ xử lý UI nếu không phải JSON request
+
             if (verifyKey && format !== 'json') {
                 try {
-                    // Chuyển sang tab verify
+
                     const verifyTabEl = document.getElementById('verify-tab');
                     if (verifyTabEl) {
                         const verifyTab = new bootstrap.Tab(verifyTabEl);
                         verifyTab.show();
                     }
-                    
-                    // Điền key và verify
+
                     const verifyKeyInput = document.getElementById('verifyKeyInput');
                     if (verifyKeyInput) {
                         verifyKeyInput.value = verifyKey;
@@ -1833,8 +1772,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                             }
                         }, 500);
                     }
-                    
-                    // Xóa param để tránh verify lại khi refresh
+
                     const newUrl = window.location.pathname;
                     window.history.replaceState({}, document.title, newUrl);
                 } catch (e) {
@@ -1843,7 +1781,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Tạo key ngẫu nhiên
         function generateRandomKey() {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let key = 'LIC-';
@@ -1858,8 +1795,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             updatePreview();
         }
 
-        // Lưu dữ liệu
-        // Sync licenses lên server (optional - để API endpoint có thể đọc)
+
         async function syncLicensesToServer() {
             try {
                 const response = await fetch(`${window.location.origin}/api/sync`, {
@@ -1871,14 +1807,13 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 });
                 const result = await response.json();
                 console.log('[SYNC] Full response:', result);
-                
-                // Xử lý race condition (concurrent update)
+
                 if (result.retry && result.error === 'Concurrent update detected') {
                     console.warn('[SYNC] Race condition detected, reloading and retrying...');
-                    // Reload dữ liệu mới nhất từ server trước khi retry
+
                     try {
                         await loadLicenses();
-                        // Retry sync với dữ liệu mới nhất
+
                         const retryResponse = await fetch(`${window.location.origin}/api/sync`, {
                             method: 'POST',
                             headers: {
@@ -1905,15 +1840,14 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     const syncedToKV = result.message && result.message.includes('Vercel KV');
                     const committedToGit = result.commit && result.commit.sha;
                     if (!syncedToKV && !committedToGit) {
-                        // Không lưu được lên server/GitHub -> cảnh báo để biết dữ liệu chỉ ở local
+
                         showToast('⚠️ Sync chưa lưu lên server. Dữ liệu chỉ tồn tại trên thiết bị này. Vui lòng kiểm tra cấu hình GITHUB_TOKEN/Vercel KV.', 'warning', 8000);
                     } else if (committedToGit) {
-                        // Nếu commit thành công lên GitHub, reload ngay và retry nếu cần
+
                         console.log('[SYNC] GitHub commit successful, will reload from GitHub...');
-                        
-                        // Hàm reload với retry logic
+
                         const reloadWithRetry = async (attempt = 1, maxAttempts = 3) => {
-                            // Tránh reload nếu đang có reload khác đang chạy
+
                             if (isLoadingFromGitHub) {
                                 console.log('[SYNC] Skipping reload, another reload is in progress');
                                 return;
@@ -1921,28 +1855,25 @@ public class LicenseInterceptor implements HandlerInterceptor {
                             
                             try {
                                 isLoadingFromGitHub = true;
-                                
-                                // Thêm delay tăng dần: attempt 1 = 2s (đợi GitHub cập nhật), attempt 2 = 3s, attempt 3 = 4s
+
                                 const delay = (attempt + 1) * 1000; // 2s, 3s, 4s
                                 console.log(`[SYNC] Waiting ${delay}ms for GitHub to update (attempt ${attempt})...`);
                                 await new Promise(resolve => setTimeout(resolve, delay));
-                                
-                                // Reset cache-busting để force reload dữ liệu mới
+
                                 lastServerDataHash = null;
                                 await loadLicenses();
                                 renderLicenses();
                                 updateStats();
-                                // Cập nhật lastGitHubRefresh để tránh reload lại ngay
+
                                 lastGitHubRefresh = Date.now();
                                 console.log(`[SYNC] UI refreshed from GitHub after sync (attempt ${attempt})`);
-                                
-                                // Nếu đây là attempt đầu tiên và dữ liệu có thể chưa cập nhật, retry thêm 1 lần nữa sau 3 giây
+
                                 if (attempt === 1 && maxAttempts > 1) {
                                     setTimeout(() => reloadWithRetry(2, maxAttempts), 3000);
                                 }
                             } catch (e) {
                                 console.error(`[SYNC] Error reloading from GitHub (attempt ${attempt}):`, e);
-                                // Retry nếu chưa đạt max attempts
+
                                 if (attempt < maxAttempts) {
                                     setTimeout(() => reloadWithRetry(attempt + 1, maxAttempts), delay);
                                 }
@@ -1952,44 +1883,38 @@ public class LicenseInterceptor implements HandlerInterceptor {
                                 }
                             }
                         };
-                        
-                        // Bắt đầu reload ngay lập tức (không đợi)
+
                         reloadWithRetry(1, 3);
                     }
                     console.log('[SYNC] Sync success:', result);
                 } else {
-                    // Nếu sync fail
+
                     const errorMsg = result.error || result.message || 'Unknown error';
                     showToast(`❌ Sync thất bại: ${errorMsg}. Vui lòng kiểm tra console để biết chi tiết.`, 'error', 8000);
                     console.error('[SYNC] Sync failed:', result);
                 }
             } catch (e) {
-                // Không báo lỗi nếu sync fail (có thể chưa có API endpoint)
+
                 showToast('⚠️ Không thể sync lên server. Dữ liệu chỉ ở thiết bị này (offline?).', 'warning', 6000);
                 console.log('[SYNC] Sync to server skipped (optional):', e.message);
             }
         }
 
 
-        // Hàm lưu và sync licenses
-        // QUAN TRỌNG: Hàm này được gọi sau MỌI thay đổi license (thêm, sửa, xóa)
-        // Đảm bảo dữ liệu luôn được sync lên server (Vercel KV hoặc file JSON)
-        // ƯU TIÊN SERVER - Không cache localStorage, luôn reload từ server sau khi sync
+
+
         async function saveLicenses() {
             try {
                 const licensesJson = JSON.stringify(licenses);
-                
-                // BƯỚC 1: Sync lên server TRƯỚC (ưu tiên server, không cache)
-                // Mọi thay đổi license (thêm, sửa, xóa) đều phải sync để tự động commit lên GitHub
+
+
                 try {
                     await syncLicensesToServer();
                     console.log('[SAVE] ✅ Sync to server successful, will reload from server');
-                    
-                    // Sau khi sync thành công, KHÔNG lưu vào localStorage ngay
-                    // Đợi reload từ server để đảm bảo dữ liệu đồng bộ
-                    // localStorage sẽ được cập nhật sau khi reload từ server trong loadLicenses()
-                    
-                    // Force reload từ server ngay sau khi sync (không đợi interval)
+
+
+
+
                     lastGitHubRefresh = 0; // Force reload
                     lastServerDataHash = null; // Reset hash để force reload
                     await loadLicenses();
@@ -2000,8 +1925,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 } catch (error) {
                     console.error('[SAVE] Lỗi khi sync lên server:', error);
                     showToast('❌ Sync tự động thất bại. Vui lòng kiểm tra cấu hình GITHUB_TOKEN trong Vercel hoặc xem console để biết chi tiết.', 'error', 8000);
-                    
-                    // Chỉ lưu vào localStorage nếu sync thất bại (fallback)
+
                     try {
                         localStorage.setItem(STORAGE_KEY, licensesJson);
                         lastLicensesSnapshot = licensesJson;
@@ -2021,14 +1945,13 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Tải dữ liệu từ server (API endpoint) hoặc localStorage
         async function loadLicenses() {
-            // ⚠️ QUAN TRỌNG: Luôn dùng API endpoint /api/licenses, KHÔNG dùng GitHub raw URL trực tiếp
-            // Ưu tiên load từ API endpoint (proxy) để tránh CORS và đồng bộ giữa các thiết bị
+
+
             let serverLicenses = [];
             try {
-                // Cache-busting cực mạnh để ĐẢM BẢO KHÔNG CACHE - Luôn lấy dữ liệu mới nhất từ server
-                // Sử dụng timestamp + performance.now() + random + Math.random() để mỗi request đều unique
+
+
                 const timestamp = Date.now();
                 const performanceTime = performance.now();
                 const random1 = Math.random().toString(36).substring(7);
@@ -2038,34 +1961,31 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 if (!sessionStorage.getItem('sessionId')) {
                     sessionStorage.setItem('sessionId', sessionId);
                 }
-                // Tạo cache-buster cực mạnh với nhiều tham số để đảm bảo không cache
+
                 const cacheBuster = `_t=${timestamp}&_p=${Math.floor(performanceTime)}&_r1=${random1}&_r2=${random2}&_u=${userAgentHash}&_s=${sessionId}&_nocache=${Date.now()}`;
-                // ⚠️ QUAN TRỌNG: Sử dụng API endpoint /api/licenses, KHÔNG dùng GitHub raw URL trực tiếp
-                // GitHub raw URL sẽ bị CORS block, phải dùng API endpoint này
+
+
                 const apiUrl = `${window.location.origin}/api/licenses?${cacheBuster}`;
-                
-                // Kiểm tra nếu URL có chứa raw.githubusercontent.com thì báo lỗi và dừng
+
                 if (apiUrl.includes('raw.githubusercontent.com')) {
                     console.error('[LOAD] ❌ CRITICAL ERROR: Code đang dùng GitHub raw URL! Phải dùng /api/licenses');
                     console.error('[LOAD] ❌ Vui lòng hard refresh (Ctrl+Shift+R) để load code mới');
                     throw new Error('Invalid URL: Should use /api/licenses endpoint. Please hard refresh browser.');
                 }
-                
-                // Đảm bảo URL đúng format
+
                 if (!apiUrl.includes('/api/licenses')) {
                     console.error('[LOAD] ❌ ERROR: URL không đúng format! Phải chứa /api/licenses');
                     throw new Error('Invalid API URL format');
                 }
                 
                 console.log(`[LOAD] 🔄 Loading from API endpoint (NO CACHE): ${apiUrl.substring(0, 100)}...`);
-                
-                // Thêm timeout để tránh treo quá lâu
+
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 giây timeout
                 
                 try {
-                    // Sử dụng API endpoint - không có CORS issue
-                    // Force no-cache với nhiều headers và options
+
+
                     const response = await fetch(apiUrl, {
                         method: 'GET',
                         cache: 'no-store', // Không cache
@@ -2082,8 +2002,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         try {
                             const json = await response.json();
                             if (Array.isArray(json)) {
-                                // Tính hash của dữ liệu để phát hiện thay đổi
-                                // Sử dụng simple hash function hỗ trợ Unicode thay vì btoa()
+
+
                                 const dataString = JSON.stringify(json);
                                 let hash = 0;
                                 for (let i = 0; i < dataString.length; i++) {
@@ -2092,8 +2012,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                                     hash = hash & hash; // Convert to 32bit integer
                                 }
                                 const dataHash = Math.abs(hash).toString(36).substring(0, 16); // Hash ngắn để so sánh
-                                
-                                // Chỉ log khi có thay đổi thực sự
+
                                 if (lastServerDataHash !== null && lastServerDataHash !== dataHash) {
                                     console.log('[LOAD] ⚡ Data changed on server! Old hash:', lastServerDataHash.substring(0, 8), 'New hash:', dataHash.substring(0, 8));
                                 }
@@ -2106,16 +2025,16 @@ public class LicenseInterceptor implements HandlerInterceptor {
                             }
                         } catch (parseError) {
                             console.error('[LOAD] Error parsing JSON from API:', parseError);
-                            // Tiếp tục với dữ liệu rỗng, sẽ dùng localStorage
+
                         }
                     } else if (response.status === 429) {
-                        // Rate limit exceeded
+
                         console.warn('[LOAD] API rate limit exceeded (429)');
                         const retryAfter = response.headers.get('Retry-After');
                         if (retryAfter) {
                             console.warn(`[LOAD] Retry after ${retryAfter} seconds`);
                         }
-                        // Tiếp tục với localStorage, không báo lỗi vì có thể retry sau
+
                     } else {
                         console.warn(`[LOAD] API response status: ${response.status}`);
                     }
@@ -2128,7 +2047,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     }
                 }
             } catch (e) {
-                // Kiểm tra nếu lỗi do dùng GitHub raw URL (code cũ)
+
                 if (e.message && (e.message.includes('raw.githubusercontent.com') || e.message.includes('Invalid URL'))) {
                     console.error('[LOAD] ❌ CRITICAL: Code cũ đang chạy! Vui lòng hard refresh (Ctrl+Shift+R)');
                     console.error('[LOAD] ❌ Browser đang cache file cũ. Hãy xóa cache và reload.');
@@ -2138,10 +2057,9 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 }
             }
 
-            // ƯU TIÊN HOÀN TOÀN SERVER DATA - Không merge với localStorage để đảm bảo đồng bộ
-            // Chỉ dùng localStorage khi server không có data hoặc lỗi
+
             if (serverLicenses.length > 0) {
-                // Server có data -> Dùng server data hoàn toàn, bỏ qua localStorage
+
                 licenses = serverLicenses.map(item => {
                     if (item && item.key) {
                         const normalizedKey = String(item.key).trim().toUpperCase();
@@ -2151,8 +2069,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 }).filter(item => item && item.key);
                 
                 console.log(`[LOAD] ✅ Using SERVER data only: ${licenses.length} licenses (ignoring localStorage for sync)`);
-                
-                // Cập nhật localStorage để đồng bộ với server (nhưng không dùng để merge)
+
                 try {
                     const serverDataJson = JSON.stringify(licenses);
                     localStorage.setItem(STORAGE_KEY, serverDataJson);
@@ -2161,7 +2078,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     console.warn('[LOAD] Could not update localStorage:', e);
                 }
             } else {
-                // Server không có data -> Fallback về localStorage (chỉ khi offline hoặc server lỗi)
+
                 let localLicenses = [];
                 try {
                     const data = localStorage.getItem(STORAGE_KEY);
@@ -2188,19 +2105,18 @@ public class LicenseInterceptor implements HandlerInterceptor {
             
             console.log(`[LOAD] Final licenses count: ${licenses.length}`);
 
-            // Lưu snapshot vào localStorage để cache
-            // QUAN TRỌNG: Ghi đè dữ liệu cũ trong localStorage bằng dữ liệu từ server
-            // Điều này đảm bảo localStorage luôn đồng bộ với server
+
+
             try {
                 const licensesJson = JSON.stringify(licenses);
                 localStorage.setItem(STORAGE_KEY, licensesJson);
                 lastLicensesSnapshot = licensesJson;
                 console.log(`[LOAD] Saved ${licenses.length} licenses to localStorage (overwritten old data)`);
             } catch (e) {
-                // Xử lý lỗi localStorage quota
+
                 if (e.name === 'QuotaExceededError' || e.code === 22) {
                     console.warn('[LOAD] LocalStorage quota exceeded, data too large to cache');
-                    // Vẫn tiếp tục, chỉ không cache được
+
                 } else {
                     console.warn('[LOAD] Could not save merged data to localStorage:', e);
                 }
@@ -2209,8 +2125,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             console.log('[LOAD] Final licenses after merge:', licenses.length);
         }
 
-        // Tự động refresh UI khi localStorage thay đổi (cùng tab hoặc tab khác)
-        // Cũng reload từ GitHub định kỳ để đồng bộ giữa các thiết bị
+
         let lastGitHubRefresh = 0;
         const GITHUB_REFRESH_INTERVAL = 1000; // Refresh từ GitHub mỗi 1 giây để đồng bộ realtime nhanh hơn
         let isLoadingFromGitHub = false; // Flag để tránh multiple concurrent reloads
@@ -2219,7 +2134,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
         async function refreshLicensesIfChanged() {
             try {
                 const data = localStorage.getItem(STORAGE_KEY);
-                // Kiểm tra localStorage thay đổi
+
                 if (data !== lastLicensesSnapshot) {
                     if (data) {
                         const parsed = JSON.parse(data);
@@ -2232,33 +2147,28 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         }
                     }
                 }
-                
-                // Định kỳ reload từ GitHub để đồng bộ giữa các thiết bị
-                // Tránh multiple concurrent reloads
+
+
                 const now = Date.now();
-                // Force reload nếu lastGitHubRefresh = 0 (được set khi visibility/focus)
+
                 const shouldReload = (now - lastGitHubRefresh >= GITHUB_REFRESH_INTERVAL || lastGitHubRefresh === 0) && !isLoadingFromGitHub;
                 
                 if (shouldReload) {
                     lastGitHubRefresh = now;
                     isLoadingFromGitHub = true;
                     try {
-                        // Lưu hash và snapshot trước khi load để so sánh
+
                         const previousHash = lastServerDataHash;
                         const previousSnapshot = lastLicensesSnapshot;
-                        
-                        // Reset hash để force reload từ server (không cache)
+
                         lastServerDataHash = null;
-                        
-                        // Load từ server (luôn mới, không cache)
+
                         await loadLicenses();
-                        
-                        // Luôn render để đảm bảo UI cập nhật với dữ liệu mới nhất từ server
+
                         const newData = JSON.stringify(licenses);
                         const dataChanged = newData !== previousSnapshot;
                         const serverDataChanged = previousHash !== null && lastServerDataHash !== null && previousHash !== lastServerDataHash;
-                        
-                        // Luôn render nếu có thay đổi hoặc đây là lần đầu load
+
                         if (dataChanged || serverDataChanged || previousSnapshot === null) {
                             lastLicensesSnapshot = newData;
                             renderLicenses();
@@ -2266,7 +2176,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                             
                             if (serverDataChanged) {
                                 console.log('[REFRESH] ⚡⚡⚡ Server data changed! UI updated from server');
-                                // Hiển thị thông báo khi có thay đổi từ thiết bị khác
+
                                 showToast('🔄 Đã cập nhật dữ liệu mới từ server', 'info', 2000);
                             } else if (dataChanged) {
                                 console.log('[REFRESH] UI updated from server (data changed)');
@@ -2274,7 +2184,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                                 console.log('[REFRESH] UI updated from server (initial load)');
                             }
                         } else {
-                            // Vẫn update stats để đảm bảo số lượng hiển thị đúng
+
                             updateStats();
                             console.log('[REFRESH] No changes detected, stats updated');
                         }
@@ -2290,14 +2200,12 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Tính trạng thái
         function getLicenseStatus(expiryDate) {
             const expiry = new Date(expiryDate);
             const now = new Date();
             const diffTime = expiry - now;
             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            
-            // Hết hạn khi đã qua thời điểm hết hạn (diffTime <= 0)
+
             if (diffTime <= 0) {
                 return { status: 'expired', days: diffDays, valid: false };
             } else if (diffDays <= 7) {
@@ -2307,7 +2215,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Định dạng thời gian
         function formatDateTime(dateString) {
             const date = new Date(dateString);
             return date.toLocaleString('vi-VN', {
@@ -2320,21 +2227,18 @@ public class LicenseInterceptor implements HandlerInterceptor {
             });
         }
 
-        // Format time remaining - hiển thị đầy đủ ngày, giờ, phút, giây
         function formatTimeRemaining(expiryDate) {
             const expiry = new Date(expiryDate);
             const now = new Date();
             const diffMs = expiry - now;
             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-            
-            // Hết hạn chỉ khi đã qua thời điểm expiry
+
             if (diffMs <= 0) return 'Đã hết hạn';
             
             const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
             const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-            
-            // Luôn hiển thị đầy đủ: ngày, giờ, phút, giây
+
             if (diffDays > 0) {
                 return `${diffDays} ngày ${diffHours} giờ ${diffMinutes} phút ${diffSeconds} giây`;
             } else if (diffHours > 0) {
@@ -2345,20 +2249,17 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 return `${diffSeconds} giây`;
             }
         }
-        
-        // Realtime countdown timer - cập nhật mỗi giây
+
         let countdownIntervals = {};
         
         function startRealtimeCountdown(licenseKey, expiryDate, elementId) {
-            // Dừng interval cũ nếu có
+
             if (countdownIntervals[licenseKey]) {
                 clearInterval(countdownIntervals[licenseKey]);
             }
-            
-            // Cập nhật ngay lập tức
+
             updateCountdownDisplay(licenseKey, expiryDate, elementId);
-            
-            // Cập nhật mỗi giây
+
             countdownIntervals[licenseKey] = setInterval(() => {
                 updateCountdownDisplay(licenseKey, expiryDate, elementId);
             }, 1000);
@@ -2367,7 +2268,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
         function updateCountdownDisplay(licenseKey, expiryDate, elementId) {
             const element = document.getElementById(elementId);
             if (!element) {
-                // Nếu element không tồn tại, dừng interval
+
                 if (countdownIntervals[licenseKey]) {
                     clearInterval(countdownIntervals[licenseKey]);
                     delete countdownIntervals[licenseKey];
@@ -2379,18 +2280,17 @@ public class LicenseInterceptor implements HandlerInterceptor {
             const now = new Date();
             const diffMs = expiry - now;
             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-            
-            // Hết hạn chỉ khi đã qua thời điểm expiry
+
             if (diffMs <= 0) {
                 element.textContent = 'Đã hết hạn';
                 element.className = 'text-danger fw-bold';
-                // Dừng interval khi hết hạn
+
                 if (countdownIntervals[licenseKey]) {
                     clearInterval(countdownIntervals[licenseKey]);
                     delete countdownIntervals[licenseKey];
                 }
-                // KHÔNG gọi renderLicenses() ở đây để tránh loop và conflict
-                // Status đã được cập nhật đúng trong renderLicenses()
+
+
                 return;
             }
             const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -2419,7 +2319,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             countdownIntervals = {};
         }
 
-        // Hiển thị modal thêm
         function showAddModal() {
             currentEditKey = null;
             document.getElementById('modalTitle').textContent = 'Thêm License Mới';
@@ -2427,8 +2326,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             document.getElementById('licenseKey').value = '';
             document.getElementById('licenseKey').readOnly = false;
             document.getElementById('licenseNote').value = '';
-            
-            // Reset checkbox và input số ngày
+
             const addToCurrentCheckbox = document.getElementById('addToCurrentDate');
             if (addToCurrentCheckbox) {
                 addToCurrentCheckbox.checked = false;
@@ -2438,8 +2336,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             if (customDaysInput) {
                 customDaysInput.value = '';
             }
-            
-            // Đặt thời gian mặc định
+
             const defaultDate = new Date();
             defaultDate.setDate(defaultDate.getDate() + 30);
             defaultDate.setMinutes(defaultDate.getMinutes() - defaultDate.getTimezoneOffset());
@@ -2451,7 +2348,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             modal.show();
         }
 
-        // Hiển thị modal sửa
         function showEditModal(key) {
             const license = licenses.find(l => l.key === key);
             if (!license) return;
@@ -2462,8 +2358,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             document.getElementById('licenseKey').value = license.key;
             document.getElementById('licenseKey').readOnly = true;
             document.getElementById('licenseNote').value = license.note || '';
-            
-            // Reset checkbox và input số ngày
+
             const addToCurrentCheckbox = document.getElementById('addToCurrentDate');
             if (addToCurrentCheckbox) {
                 addToCurrentCheckbox.checked = false;
@@ -2473,8 +2368,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             if (customDaysInput) {
                 customDaysInput.value = '';
             }
-            
-            // Định dạng ngày
+
             const expiryDate = new Date(license.expiry);
             expiryDate.setMinutes(expiryDate.getMinutes() - expiryDate.getTimezoneOffset());
             document.getElementById('expiryDate').value = expiryDate.toISOString().slice(0, 16);
@@ -2485,7 +2379,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             modal.show();
         }
 
-        // Cập nhật preview
         function updatePreview() {
             const key = document.getElementById('licenseKey').value;
             const expiry = document.getElementById('expiryDate').value;
@@ -2499,11 +2392,11 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 
                 switch(status.status) {
                     case 'valid':
-                        statusText = `Còn hạn (${status.days} ngày)`;
+                        statusText = 'Còn hạn';
                         statusClass = 'status-valid';
                         break;
                     case 'expiring':
-                        statusText = `Sắp hết hạn (${status.days} ngày)`;
+                        statusText = 'Còn hạn';
                         statusClass = 'status-expiring';
                         break;
                     case 'expired':
@@ -2511,8 +2404,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         statusClass = 'status-expired';
                         break;
                 }
-                
-                // Nếu đã hết hạn thì hiển thị "Đã hết hạn", không gọi formatTimeRemaining
+
                 const timeRemainingPreview = status.status === 'expired' ? 'Đã hết hạn' : formatTimeRemaining(expiryDate);
                 
                 document.getElementById('previewContent').innerHTML = `
@@ -2541,7 +2433,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Thêm ngày
         function addDays(days) {
             const date = new Date();
             date.setDate(date.getDate() + days);
@@ -2550,7 +2441,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             updatePreview();
         }
 
-        // Cập nhật label cho tùy chọn số ngày
         function updateCustomDaysLabel() {
             const checkbox = document.getElementById('addToCurrentDate');
             const helpText = document.getElementById('customDaysHelp');
@@ -2561,7 +2451,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Thêm số ngày tùy chỉnh
         function addCustomDays() {
             const customDays = parseInt(document.getElementById('customDaysInput').value);
             if (!customDays || customDays < 1 || customDays > 3650) {
@@ -2571,7 +2460,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             
             const addToCurrent = document.getElementById('addToCurrentDate').checked;
             if (addToCurrent) {
-                // Cộng thêm vào ngày đã chọn
+
                 const expiryInput = document.getElementById('expiryDate').value;
                 if (!expiryInput) {
                     showModalAlert('Vui lòng chọn ngày hết hạn trước', 'Thiếu thông tin', 'warning');
@@ -2582,14 +2471,13 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 currentDate.setMinutes(currentDate.getMinutes() - currentDate.getTimezoneOffset());
                 document.getElementById('expiryDate').value = currentDate.toISOString().slice(0, 16);
             } else {
-                // Thêm từ hôm nay (chế độ cũ)
+
                 addDays(customDays);
             }
             document.getElementById('customDaysInput').value = '';
             updatePreview();
         }
 
-        // Đặt thời gian hiện tại
         function setNow() {
             const date = new Date();
             date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
@@ -2597,8 +2485,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             updatePreview();
         }
 
-        // Lưu license (THÊM hoặc SỬA)
-        // QUAN TRỌNG: Mọi thay đổi license đều phải gọi saveLicenses() để sync lên server/JSON
+
         function saveLicense() {
             const key = document.getElementById('licenseKey').value.trim().toUpperCase();
             const expiry = document.getElementById('expiryDate').value;
@@ -2608,61 +2495,56 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 showModalAlert('Vui lòng nhập đầy đủ thông tin', 'Thiếu thông tin', 'warning');
                 return false;
             }
-            
-            // Validation: Kiểm tra format key (chỉ cho phép chữ, số, dấu gạch ngang và gạch dưới)
+
             const keyPattern = /^[A-Z0-9\-_]+$/;
             if (!keyPattern.test(key)) {
                 showModalAlert('License key chỉ được chứa chữ cái, số, dấu gạch ngang (-) và gạch dưới (_)', 'Key không hợp lệ', 'warning');
                 return false;
             }
-            
-            // Validation: Kiểm tra độ dài key (tối đa 100 ký tự)
+
             if (key.length > 100) {
                 showModalAlert('License key không được vượt quá 100 ký tự', 'Key quá dài', 'warning');
                 return false;
             }
-            
-            // Validation: Kiểm tra độ dài note (tối đa 500 ký tự)
+
             if (note.length > 500) {
                 showModalAlert('Ghi chú không được vượt quá 500 ký tự', 'Ghi chú quá dài', 'warning');
                 return false;
             }
-            
-            // Kiểm tra key trùng
+
             if (!currentEditKey && licenses.some(l => l.key === key)) {
                 showModalAlert('License key đã tồn tại! Vui lòng chọn key khác.', 'Key trùng lặp', 'warning');
                 return false;
             }
             
             const expiryDate = new Date(expiry);
-            
-            // Validation: Kiểm tra date hợp lệ
+
             if (isNaN(expiryDate.getTime())) {
                 showModalAlert('Ngày hết hạn không hợp lệ', 'Lỗi định dạng ngày', 'error');
                 return false;
             }
             
             if (currentEditKey) {
-                // CẬP NHẬT license hiện có
-                // Đảm bảo key không bị thay đổi (mặc dù đã readOnly nhưng cần kiểm tra an toàn)
+
+
                 const index = licenses.findIndex(l => l.key === currentEditKey);
                 if (index !== -1) {
-                    // Kiểm tra key có bị thay đổi không (an toàn)
+
                     if (licenses[index].key !== key) {
                         console.warn('[SAVE] Key mismatch detected, using original key:', currentEditKey);
-                        // Nếu key bị thay đổi (không nên xảy ra vì readOnly), vẫn dùng key gốc
+
                     }
                     licenses[index].expiry = expiryDate.toISOString();
                     licenses[index].note = note;
                     licenses[index].updated = new Date().toISOString();
-                    // Đảm bảo key không bị thay đổi
+
                     licenses[index].key = currentEditKey;
                 } else {
                     showModalAlert('Không tìm thấy license để cập nhật', 'Lỗi', 'error');
                     return false;
                 }
             } else {
-                // THÊM license mới
+
                 licenses.push({
                     key: key,
                     expiry: expiryDate.toISOString(),
@@ -2671,15 +2553,12 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     updated: new Date().toISOString()
                 });
             }
-            
-            // BẮT BUỘC: Lưu và sync lên server/JSON sau mọi thay đổi
+
             saveLicenses();
-            
-            // Render ngay với dữ liệu local để UI responsive
+
             renderLicenses();
             updateStats();
-            
-            // Reset edit key sau khi save
+
             const wasEditing = !!currentEditKey;
             currentEditKey = null;
             
@@ -2687,9 +2566,8 @@ public class LicenseInterceptor implements HandlerInterceptor {
             modal.hide();
             
             showToast(wasEditing ? 'Cập nhật thành công! Đang đồng bộ...' : 'Thêm license thành công! Đang đồng bộ...');
-            
-            // Force reload từ GitHub sau một chút để đảm bảo dữ liệu mới nhất
-            // Đặc biệt quan trọng trên mobile khi network có thể chậm
+
+
             setTimeout(async () => {
                 try {
                     if (!isLoadingFromGitHub) {
@@ -2706,8 +2584,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // Xóa license với modal xác nhận và mật khẩu
-        // QUAN TRỌNG: Sau khi xóa phải gọi saveLicenses() để sync lên server/JSON
+
         function deleteLicense(key) {
             const deletePassword = 'Nguy3nc0ngd@t';
             const modalId = 'deleteConfirmModal_' + Date.now();
@@ -2755,8 +2632,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     </div>
                 </div>
             `;
-            
-            // Xóa modal cũ nếu có
+
             const oldModal = document.querySelector('[id^="deleteConfirmModal_"]');
             if (oldModal) oldModal.remove();
             
@@ -2769,24 +2645,21 @@ public class LicenseInterceptor implements HandlerInterceptor {
             const errorDiv = document.getElementById('deletePasswordError_' + modalId);
             const toggleBtn = document.getElementById('toggleDeletePassword_' + modalId);
             const toggleIcon = document.getElementById('deletePasswordIcon_' + modalId);
-            
-            // Toggle password visibility
+
             toggleBtn.addEventListener('click', function() {
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
                 passwordInput.setAttribute('type', type);
                 toggleIcon.classList.toggle('bi-eye');
                 toggleIcon.classList.toggle('bi-eye-slash');
             });
-            
-            // Handle Enter key
+
             passwordInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     confirmBtn.click();
                 }
             });
-            
-            // Handle confirm delete
+
             confirmBtn.addEventListener('click', function() {
                 const enteredPassword = passwordInput.value.trim();
                 
@@ -2803,12 +2676,10 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     passwordInput.focus();
                     return;
                 }
-                
-                // Mật khẩu đúng, tiến hành xóa
+
                 passwordInput.classList.remove('is-invalid');
                 licenses = licenses.filter(l => l.key !== key);
-                
-                // BẮT BUỘC: Lưu và sync lên server/JSON sau khi xóa
+
                 saveLicenses();
                 renderLicenses();
                 updateStats();
@@ -2825,28 +2696,23 @@ public class LicenseInterceptor implements HandlerInterceptor {
             setTimeout(() => passwordInput.focus(), 300);
         }
 
-        // Render licenses với pagination
         function renderLicenses(filteredLicenses = null) {
             const container = document.getElementById('licensesContainer');
             const emptyState = document.getElementById('emptyState');
             const paginationContainer = document.getElementById('paginationContainer');
             const data = filteredLicenses || licenses;
-            
-            // Lưu filtered data để pagination
+
             filteredLicensesForPagination = data;
             
             if (data.length === 0) {
                 container.innerHTML = '';
                 emptyState.style.display = 'block';
                 paginationContainer.style.display = 'none';
-                document.getElementById('totalLicenses').textContent = '0 license';
                 return;
             }
             
             emptyState.style.display = 'none';
-            document.getElementById('totalLicenses').textContent = `${data.length} license${data.length > 1 ? 's' : ''}`;
-            
-            // Tính toán pagination
+
             const totalPages = Math.ceil(data.length / itemsPerPage);
             if (currentPage > totalPages) {
                 currentPage = totalPages || 1;
@@ -2860,7 +2726,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             paginatedData.forEach((license, index) => {
                 const globalIndex = startIndex + index;
                 const status = getLicenseStatus(license.expiry);
-                // Nếu đã hết hạn thì hiển thị "Đã hết hạn", không gọi formatTimeRemaining
+
                 const timeRemaining = status.status === 'expired' ? 'Đã hết hạn' : formatTimeRemaining(license.expiry);
                 const created = formatDateTime(license.created);
                 const expiry = formatDateTime(license.expiry);
@@ -2871,12 +2737,12 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 
                 switch(status.status) {
                     case 'valid':
-                        statusText = `Còn hạn (${status.days} ngày)`;
+                        statusText = 'Còn hạn';
                         statusClass = 'status-valid';
                         icon = 'bi-check-circle-fill';
                         break;
                     case 'expiring':
-                        statusText = `Sắp hết hạn (${status.days} ngày)`;
+                        statusText = 'Còn hạn';
                         statusClass = 'status-expiring';
                         icon = 'bi-exclamation-triangle-fill';
                         break;
@@ -2953,22 +2819,20 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     </div>
                 `;
             });
-            
-            // Dừng tất cả countdown intervals trước khi render lại để tránh conflict
+
             stopAllCountdowns();
             
             container.innerHTML = html;
-            
-            // Khởi động realtime countdown cho licenses trong trang hiện tại
+
             paginatedData.forEach((license, index) => {
                 const globalIndex = startIndex + index;
                 const licenseStatus = getLicenseStatus(license.expiry);
                 const countdownId = `countdown_${license.key}_${globalIndex}`;
-                // Chỉ khởi động countdown cho license chưa hết hạn
+
                 if (licenseStatus.status !== 'expired') {
                     startRealtimeCountdown(license.key, license.expiry, countdownId);
                 } else {
-                    // Đảm bảo element hiển thị "Đã hết hạn" và không có interval nào chạy
+
                     const element = document.getElementById(countdownId);
                     if (element) {
                         element.textContent = 'Đã hết hạn';
@@ -2976,15 +2840,12 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     }
                 }
             });
-            
-            // Render pagination
+
             renderPagination(totalPages);
-            
-            // Update bulk actions visibility
+
             updateBulkActions();
         }
-        
-        // Render pagination controls
+
         function renderPagination(totalPages) {
             const paginationContainer = document.getElementById('paginationContainer');
             const paginationList = document.getElementById('paginationList');
@@ -2996,8 +2857,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             
             paginationContainer.style.display = 'block';
             let html = '';
-            
-            // Previous button
+
             html += `
                 <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
                     <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;" 
@@ -3006,8 +2866,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     </a>
                 </li>
             `;
-            
-            // Page numbers
+
             const maxVisiblePages = 5;
             let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
             let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
@@ -3037,8 +2896,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 }
                 html += `<li class="page-item"><a class="page-link" href="#" onclick="goToPage(${totalPages}); return false;">${totalPages}</a></li>`;
             }
-            
-            // Next button
+
             html += `
                 <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
                     <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;"
@@ -3050,20 +2908,17 @@ public class LicenseInterceptor implements HandlerInterceptor {
             
             paginationList.innerHTML = html;
         }
-        
-        // Điều hướng đến trang
+
         function goToPage(page) {
             const totalPages = Math.ceil(filteredLicensesForPagination.length / itemsPerPage);
             if (page < 1 || page > totalPages) return;
             
             currentPage = page;
             renderLicenses(filteredLicensesForPagination);
-            
-            // Scroll to top of container
+
             document.getElementById('licensesContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-        
-        // Toggle select all
+
         function toggleSelectAll(checked) {
             const checkboxes = document.querySelectorAll('.license-checkbox');
             checkboxes.forEach(checkbox => {
@@ -3071,8 +2926,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             });
             updateBulkActions();
         }
-        
-        // Update bulk actions UI
+
         function updateBulkActions() {
             const checkboxes = document.querySelectorAll('.license-checkbox:checked');
             const selectedCount = checkboxes.length;
@@ -3086,18 +2940,16 @@ public class LicenseInterceptor implements HandlerInterceptor {
             } else {
                 bulkActionsContainer.style.display = 'none';
             }
-            
-            // Update select all checkbox state
+
             const allCheckboxes = document.querySelectorAll('.license-checkbox');
             if (selectAllCheckbox) {
                 selectAllCheckbox.checked = allCheckboxes.length > 0 && selectedCount === allCheckboxes.length;
                 selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < allCheckboxes.length;
             }
         }
-        
-        // Bulk delete licenses
-        // Xóa nhiều license cùng lúc
-        // QUAN TRỌNG: Sau khi xóa phải gọi saveLicenses() để sync lên server/JSON
+
+
+
         function bulkDeleteLicenses() {
             const checkboxes = document.querySelectorAll('.license-checkbox:checked');
             const selectedKeys = Array.from(checkboxes).map(cb => cb.getAttribute('data-license-key'));
@@ -3153,8 +3005,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     </div>
                 </div>
             `;
-            
-            // Xóa modal cũ nếu có
+
             const oldModal = document.querySelector('[id^="bulkDeleteModal_"]');
             if (oldModal) oldModal.remove();
             
@@ -3167,24 +3018,21 @@ public class LicenseInterceptor implements HandlerInterceptor {
             const errorDiv = document.getElementById('bulkDeletePasswordError_' + modalId);
             const toggleBtn = document.getElementById('toggleBulkDeletePassword_' + modalId);
             const toggleIcon = document.getElementById('bulkDeletePasswordIcon_' + modalId);
-            
-            // Toggle password visibility
+
             toggleBtn.addEventListener('click', function() {
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
                 passwordInput.setAttribute('type', type);
                 toggleIcon.classList.toggle('bi-eye');
                 toggleIcon.classList.toggle('bi-eye-slash');
             });
-            
-            // Handle Enter key
+
             passwordInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     confirmBtn.click();
                 }
             });
-            
-            // Handle confirm delete
+
             confirmBtn.addEventListener('click', function() {
                 const enteredPassword = passwordInput.value.trim();
                 
@@ -3201,17 +3049,13 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     passwordInput.focus();
                     return;
                 }
-                
-                // Mật khẩu đúng, tiến hành xóa
+
                 passwordInput.classList.remove('is-invalid');
-                
-                // Xóa các licenses đã chọn
+
                 licenses = licenses.filter(l => !selectedKeys.includes(l.key));
-                
-                // BẮT BUỘC: Lưu và sync lên server/JSON sau khi xóa
+
                 saveLicenses();
-                
-                // Reset selection
+
                 checkboxes.forEach(cb => cb.checked = false);
                 
                 renderLicenses();
@@ -3229,8 +3073,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             setTimeout(() => passwordInput.focus(), 300);
         }
 
-        // Cập nhật thống kê
-        // Cập nhật thống kê - luôn tính toán từ licenses hiện tại để đảm bảo chính xác
+
         function updateStats() {
             let valid = 0, expiring = 0, expired = 0;
             
@@ -3246,7 +3089,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             document.getElementById('expiredCount').textContent = expired;
         }
 
-        // Lọc licenses
         function filterLicenses() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const statusFilter = document.getElementById('statusFilter').value;
@@ -3265,20 +3107,17 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     getLicenseStatus(license.expiry).status === statusFilter
                 );
             }
-            
-            // Reset về trang 1 khi filter
+
             currentPage = 1;
             renderLicenses(filtered);
         }
 
-        // Xóa tìm kiếm
         function clearSearch() {
             document.getElementById('searchInput').value = '';
             document.getElementById('statusFilter').value = 'all';
             filterLicenses();
         }
 
-        // Verify license
         function verifyLicense() {
             const key = document.getElementById('verifyKeyInput').value.trim().toUpperCase();
             if (!key) {
@@ -3301,7 +3140,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             
             const status = getLicenseStatus(license.expiry);
             const expiry = formatDateTime(license.expiry);
-            // Nếu đã hết hạn thì hiển thị "Đã hết hạn", không gọi formatTimeRemaining
+
             const timeRemaining = status.status === 'expired' ? 'Đã hết hạn' : formatTimeRemaining(license.expiry);
             
             let alertClass = '';
@@ -3355,7 +3194,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             `;
         }
 
-        // Tạo QR code - sử dụng API online hoặc library
         function generateQRCode() {
             const key = document.getElementById('qrKeyInput').value.trim().toUpperCase();
             if (!key) {
@@ -3371,8 +3209,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             
             const verifyUrl = getVerifyUrl(key);
             container.innerHTML = '<div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>';
-            
-            // Ưu tiên dùng QRCode library nếu có
+
             if (typeof QRCode !== 'undefined') {
                 try {
                     QRCode.toCanvas(verifyUrl, { 
@@ -3411,14 +3248,12 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     console.warn('QRCode library error, using API fallback:', e);
                 }
             }
-            
-            // Fallback: dùng API online để tạo QR code
+
             generateQRCodeWithAPI(verifyUrl, key, container);
         }
-        
-        // Tạo QR code bằng API online (không cần library)
+
         function generateQRCodeWithAPI(url, key, container) {
-            // Sử dụng API QR code miễn phí
+
             const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
             
             const img = document.createElement('img');
@@ -3447,7 +3282,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             };
             
             img.onerror = function() {
-                // Nếu API cũng fail, hiển thị URL để copy
+
                 container.innerHTML = `
                     <div class="alert alert-warning">
                         <h6><i class="bi bi-exclamation-triangle"></i> Không thể tạo QR code</h6>
@@ -3462,8 +3297,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 `;
             };
         }
-        
-        // Download QR code từ API
+
         function downloadQRCodeFromAPI(key, url) {
             const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(url)}`;
             const link = document.createElement('a');
@@ -3472,8 +3306,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
             link.target = '_blank';
             link.click();
         }
-        
-        // Tải QR code (hỗ trợ cả canvas và img)
+
         function downloadQRCode(key) {
             const verifyUrl = getVerifyUrl(key);
             const canvas = document.querySelector('#qrCodeContainer canvas');
@@ -3485,7 +3318,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 link.href = canvas.toDataURL('image/png');
                 link.click();
             } else if (img) {
-                // Download từ API
+
                 downloadQRCodeFromAPI(key, verifyUrl);
             }
         }
@@ -3493,13 +3326,11 @@ public class LicenseInterceptor implements HandlerInterceptor {
         let verifyUrlModalInstance = null;
         let verifyUrlModalEl = null;
 
-        // Lấy verify URL
-        // Trả về endpoint API verify trực tiếp thay vì trang HTML
+
         function getVerifyUrl(key) {
             return `${window.location.origin}/api/verify?verify=${encodeURIComponent(key)}`;
         }
 
-        // Hiển thị verify URL
         function showVerifyUrl(key) {
             const url = getVerifyUrl(key);
             const safeKey = escapeHtml(key);
@@ -3532,8 +3363,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                     </div>
                 </div>
             `;
-            
-            // Xóa modal cũ nếu có
+
             const oldModal = document.getElementById('verifyUrlModal');
             if (oldModal) oldModal.remove();
             
@@ -3548,25 +3378,22 @@ public class LicenseInterceptor implements HandlerInterceptor {
             });
         }
 
-        // Copy license key với visual feedback
         function copyLicenseKey(key, element) {
             if (!key || !element) return;
-            
-            // Copy to clipboard
+
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(key).then(() => {
-                    // Visual feedback
+
                     element.classList.add('copied');
                     showToast('Đã sao chép license key vào clipboard!', 'success');
-                    
-                    // Remove copied class after 1.5 seconds
+
                     setTimeout(() => {
                         element.classList.remove('copied');
                     }, 1500);
                 }).catch(err => {
                     console.error('Error copying to clipboard:', err);
                     fallbackCopyToClipboard(key);
-                    // Visual feedback even on fallback
+
                     element.classList.add('copied');
                     setTimeout(() => {
                         element.classList.remove('copied');
@@ -3574,7 +3401,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 });
             } else {
                 fallbackCopyToClipboard(key);
-                // Visual feedback
+
                 element.classList.add('copied');
                 setTimeout(() => {
                     element.classList.remove('copied');
@@ -3582,17 +3409,15 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Copy to clipboard
         function copyToClipboard(text) {
             if (!text) return;
-            
-            // Fallback cho trình duyệt cũ
+
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text).then(() => {
                     showToast('Đã sao chép vào clipboard!');
                 }).catch(err => {
                     console.error('Error copying to clipboard:', err);
-                    // Fallback method
+
                     fallbackCopyToClipboard(text);
                 });
             } else {
@@ -3600,7 +3425,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Fallback copy method
         function fallbackCopyToClipboard(text) {
             const textArea = document.createElement('textarea');
             textArea.value = text;
@@ -3624,7 +3448,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             document.body.removeChild(textArea);
         }
 
-        // Cập nhật live endpoint
         function updateLiveEndpoint() {
             try {
                 const endpoint = `${window.location.origin}${window.location.pathname}`;
@@ -3646,30 +3469,24 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Copy endpoint
         function copyEndpoint() {
             copyToClipboard(document.getElementById('liveEndpoint').textContent);
         }
 
-        // Refresh endpoint
         function refreshEndpoint() {
             updateLiveEndpoint();
             showToast('Đã làm mới endpoint!');
         }
 
-        // Test API
         async function testApi() {
             const key = await showModalPrompt('Nhập license key để test API:', 'Test API', '');
             if (!key) return;
-            
-            // Gọi trực tiếp API function thay vì fetch để tránh CORS và network issues
+
             try {
                 const result = window.verifyLicenseApi(key);
-                
-                // Hiển thị kết quả trong một modal hoặc alert đẹp hơn
+
                 const resultText = JSON.stringify(result, null, 2);
-                
-                // Tạo modal để hiển thị kết quả
+
                 const modalHtml = `
                     <div class="modal fade" id="apiTestModal" tabindex="-1">
                         <div class="modal-dialog modal-lg">
@@ -3707,27 +3524,22 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         </div>
                     </div>
                 `;
-                
-                // Xóa modal cũ nếu có
+
                 const oldModal = document.getElementById('apiTestModal');
                 if (oldModal) {
                     oldModal.remove();
                 }
-                
-                // Thêm modal mới
+
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
-                
-                // Lưu result vào data attribute để có thể copy sau
+
                 const modalEl = document.getElementById('apiTestModal');
                 if (modalEl) {
                     modalEl.setAttribute('data-api-result', resultText);
                 }
-                
-                // Hiển thị modal
+
                 const modal = new bootstrap.Modal(modalEl);
                 modal.show();
-                
-                // Xóa modal khi đóng
+
                 modalEl.addEventListener('hidden.bs.modal', function() {
                     this.remove();
                 });
@@ -3738,7 +3550,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-        // Copy API test result
         function copyApiTestResult() {
             const modalEl = document.getElementById('apiTestModal');
             if (!modalEl) return;
@@ -3749,8 +3560,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }
         }
 
-
-        // API endpoint function (đã được xử lý ở trên trong IIFE)
         window.verifyLicenseApi = function(key) {
             const license = licenses.find(l => l.key === key.toUpperCase());
             const now = new Date();
@@ -3767,12 +3576,11 @@ public class LicenseInterceptor implements HandlerInterceptor {
             
             const status = getLicenseStatus(license.expiry);
             const expiry = new Date(license.expiry);
-            
-            // Đảm bảo status format đúng với app.py mong đợi
-            // app.py kiểm tra: status in ("active", "đang hoạt động", "") thì hợp lệ
+
+
             let apiStatus = status.status;
             if (status.valid && status.status !== 'expired') {
-                // License hợp lệ (kể cả sắp hết hạn) -> status = "active" để app.py chấp nhận
+
                 apiStatus = 'active';
             } else if (status.status === 'expired') {
                 apiStatus = 'expired';
@@ -3792,7 +3600,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             };
         };
 
-        // Hiển thị toast
         function showToast(message, type = 'success') {
             const toast = document.createElement('div');
             toast.className = 'position-fixed bottom-0 end-0 p-3';
@@ -3824,7 +3631,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             }, 3000);
         }
 
-        // Hiển thị modal alert thay vì alert()
         function showModalAlert(message, title = 'Thông báo', type = 'info') {
             return new Promise((resolve) => {
                 const modalId = 'modalAlert_' + Date.now();
@@ -3854,8 +3660,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
                 const modalEl = document.getElementById(modalId);
                 const modal = new bootstrap.Modal(modalEl);
-                
-                // Setup event handler
+
                 const okBtn = document.getElementById('alertOkBtn_' + modalId);
                 okBtn.addEventListener('click', function() {
                     modal.hide();
@@ -3870,7 +3675,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
             });
         }
 
-        // Hiển thị modal prompt thay vì prompt()
         function showModalPrompt(message, title = 'Nhập liệu', defaultValue = '') {
             return new Promise((resolve) => {
                 const modalId = 'modalPrompt_' + Date.now();
@@ -3917,8 +3721,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
                 const modalEl = document.getElementById(modalId);
                 const modal = new bootstrap.Modal(modalEl);
-                
-                // Setup event handlers
+
                 const inputEl = document.getElementById(inputId);
                 const okBtn = document.getElementById('promptOkBtn');
                 
@@ -3940,8 +3743,7 @@ public class LicenseInterceptor implements HandlerInterceptor {
                         doResolve(null);
                     }
                 });
-                
-                // Show modal và focus input
+
                 modal.show();
                 setTimeout(() => {
                     inputEl.focus();

@@ -1,6 +1,4 @@
-// Vercel Serverless Function để proxy licenses.json từ GitHub (tránh CORS)
 export default async function handler(req, res) {
-  // Chỉ cho phép GET request
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -10,14 +8,12 @@ export default async function handler(req, res) {
     const repo = process.env.GITHUB_REPO_NAME || 'ManagementLicense';
     const branch = process.env.GITHUB_REPO_BRANCH || 'main';
     
-    // Thử lấy từ GitHub API trước (có thể có token để tránh rate limit)
     const githubToken = process.env.GITHUB_TOKEN;
     const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/licenses.json?ref=${branch}`;
     
     let licenses = [];
     let useRawUrl = false;
     
-    // Nếu có token, dùng GitHub API (không bị rate limit nhiều)
     if (githubToken) {
       try {
         const controller = new AbortController();
@@ -36,7 +32,6 @@ export default async function handler(req, res) {
         
         if (apiResponse.ok) {
           const fileData = await apiResponse.json();
-          // Decode base64 content
           const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
           const parsed = JSON.parse(content);
           if (Array.isArray(parsed)) {
@@ -54,7 +49,6 @@ export default async function handler(req, res) {
       useRawUrl = true;
     }
     
-    // Fallback: dùng raw URL nếu API không có token hoặc fail
     if (useRawUrl && licenses.length === 0) {
       const githubRawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/licenses.json`;
       
@@ -79,7 +73,6 @@ export default async function handler(req, res) {
             console.log('[LICENSES API] Loaded from GitHub raw:', licenses.length);
           }
         } else if (rawResponse.status === 404) {
-          // File chưa tồn tại, trả về mảng rỗng
           licenses = [];
           console.log('[LICENSES API] File not found on GitHub, returning empty array');
         } else {
@@ -95,8 +88,6 @@ export default async function handler(req, res) {
       }
     }
     
-    // Set CORS headers để cho phép client-side fetch
-    // Đảm bảo KHÔNG CACHE - Luôn trả về dữ liệu mới nhất
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -106,26 +97,22 @@ export default async function handler(req, res) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Type', 'application/json');
     
-    // Thêm timestamp vào response để client biết đây là dữ liệu mới
     const responseData = {
         licenses: licenses,
         timestamp: new Date().toISOString(),
         count: licenses.length
     };
     
-    return res.status(200).json(licenses); // Trả về array trực tiếp để tương thích với code hiện tại
+    return res.status(200).json(licenses);
     
   } catch (error) {
     console.error('[LICENSES API] Error:', error);
     
-    // Set CORS headers ngay cả khi lỗi
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.setHeader('Content-Type', 'application/json');
     
-    // Trả về mảng rỗng thay vì lỗi để app vẫn hoạt động
     return res.status(200).json([]);
   }
 }
-
