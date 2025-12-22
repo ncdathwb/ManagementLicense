@@ -2083,8 +2083,15 @@ public class LicenseInterceptor implements HandlerInterceptor {
                             const json = await response.json();
                             if (Array.isArray(json)) {
                                 // Tính hash của dữ liệu để phát hiện thay đổi
+                                // Sử dụng simple hash function hỗ trợ Unicode thay vì btoa()
                                 const dataString = JSON.stringify(json);
-                                const dataHash = btoa(dataString).substring(0, 32); // Hash ngắn để so sánh
+                                let hash = 0;
+                                for (let i = 0; i < dataString.length; i++) {
+                                    const char = dataString.charCodeAt(i);
+                                    hash = ((hash << 5) - hash) + char;
+                                    hash = hash & hash; // Convert to 32bit integer
+                                }
+                                const dataHash = Math.abs(hash).toString(36).substring(0, 16); // Hash ngắn để so sánh
                                 
                                 // Chỉ log khi có thay đổi thực sự
                                 if (lastServerDataHash !== null && lastServerDataHash !== dataHash) {
