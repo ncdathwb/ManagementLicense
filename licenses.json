@@ -1,23 +1,9 @@
 [
   {
     "key": "LIC-W8B61JUL-F7OD",
-    "expiry": "2025-12-20T08:58:00.000Z",
+    "expiry": "2027-12-22T02:38:00.000Z",
     "note": "Dmi quản lý chấm công và nghỉ phép của nhân viên",
     "created": "2025-12-19T06:42:04.660Z",
-    "updated": "2025-12-19T08:58:28.071Z"
-  },
-  {
-    "key": "LIC-FHU9IH1V-XET7",
-    "expiry": "2027-12-19T11:42:00.000Z",
-    "note": "",
-    "created": "2025-12-19T11:42:36.565Z",
-    "updated": "2025-12-19T11:42:36.565Z"
-  },
-  {
-    "key": "LIC-CD3G8YQE-7WX0",
-    "expiry": "2027-12-22T02:21:00.000Z",
-    "note": "",
-    "created": "2025-12-22T02:21:47.430Z",
-    "updated": "2025-12-22T02:21:47.430Z"
+    "updated": "2025-12-22T02:38:48.189Z"
   }
 ]
